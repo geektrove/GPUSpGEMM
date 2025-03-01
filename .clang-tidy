@@ -1,0 +1,43 @@
+---
+Checks: >
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -cppcoreguidelines-pro-bounds-*,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-owning-memory,
+  -readability-braces-around-statements,
+  -readability-identifier-length,
+  -readability-static-accessed-through-instance,
+  -readability-redundant-declaration,
+  -modernize-avoid-c-arrays,
+WarningsAsErrors: ""
+HeaderFileExtensions:
+  - ""
+  - h
+  - hh
+  - hpp
+  - hxx
+  - cuh
+ImplementationFileExtensions:
+  - c
+  - cc
+  - cpp
+  - cxx
+  - cu
+HeaderFilterRegex: ".*"
+ExcludeHeaderFilterRegex: ""
+FormatStyle: file
+CheckOptions: []
+SystemHeaders: false
+---
+

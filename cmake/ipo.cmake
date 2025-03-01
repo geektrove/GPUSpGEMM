@@ -1,0 +1,2 @@
+include(CheckIPOSupported)
+check_ipo_supported(RESULT CMAKE_INTERPROCEDURAL_OPTIMIZATION)
