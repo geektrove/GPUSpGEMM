@@ -183,7 +183,7 @@ MacroBlockBegin: ""
 MacroBlockEnd: ""
 MainIncludeChar: Any
 MaxEmptyLinesToKeep: 1
-NamespaceIndentation: All
+NamespaceIndentation: None
 ObjCBinPackProtocolList: Auto
 ObjCBlockIndentWidth: 2
 ObjCBreakBeforeNestedBlockParam: true
