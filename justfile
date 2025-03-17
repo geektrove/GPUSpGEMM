@@ -1,28 +1,22 @@
 #!/usr/bin/env just --justfile
 
+preset := "dev-gcc-release"
+
 default:
     just --list
 
 clean:
     rm -rf build/
-    rm -f CMakeConanPresets.json
 
-conan profile="clang" type="release":
-    conan install conanfile.py \
-    --profile:all={{ profile }} \
-    --settings=build_type={{ capitalize(type) }} \
-    --build=missing
-
-configure preset="dev-clang-release":
+configure:
     cmake \
     --preset={{ preset }} \
-    -DCMAKE_CUDA_ARCHITECTURES="86;80"
 
-build preset="dev-clang-release":
+build:
     cmake --build --preset={{ preset }}
 
-compdb build_dir="build/clang-release":
-    compdb -p {{ build_dir }} list >compile_commands.json
+compdb:
+    compdb -p build/{{ preset }} list >compile_commands.json
 
 format:
     just --fmt --unstable
