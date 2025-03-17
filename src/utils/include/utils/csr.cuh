@@ -8,9 +8,10 @@
 
 #include <gsl/gsl-lite.hpp>
 
-#include "utils_cuda.cuh"
+#include <utils/errors.cuh>
 
 namespace utils {
+
 enum class Location : std::uint8_t {
     Host,
     Device,

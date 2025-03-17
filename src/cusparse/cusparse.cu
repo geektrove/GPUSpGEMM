@@ -6,11 +6,23 @@
 #include <fmt/core.h>
 #include <gsl/gsl-lite.hpp>
 
-#include <utils/csr.cuh>
-#include <utils/utils_cuda.cuh>
-#include <utils/utils_cusparse.cuh>
+#include <utils/utils.cuh>
 
 using namespace utils;
+
+#define CHECK_CUSPARSE(value) check_cusparse_error((value), #value, __FILE__, __LINE__)
+
+auto check_cusparse_error(const cusparseStatus_t status,
+                          const char* const function,
+                          const char* const file,
+                          const int line) -> void {
+    if (status == CUSPARSE_STATUS_SUCCESS)
+        return;
+    const auto* reason{cusparseGetErrorString(status)};
+    const auto message{
+        fmt::format("CUSPARSE error ({}:{}:{}): {}", file, line, function, reason)};
+    throw std::runtime_error(message);
+}
 
 template<std::floating_point T>
 auto get_nips_square(const CSR<T, Location::Device>& a) -> int64_t {

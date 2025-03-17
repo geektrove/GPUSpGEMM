@@ -8,9 +8,9 @@ target_sources(
            BASE_DIRS
            include/
            FILES
+           include/utils/utils.cuh
            include/utils/csr.cuh
-           include/utils/utils_cuda.cuh
-           include/utils/utils_cusparse.cuh)
+           include/utils/errors.cuh)
 
 target_compile_features(utils INTERFACE cxx_std_20 cuda_std_20)
 set_target_properties(
