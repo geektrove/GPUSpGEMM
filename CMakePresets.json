@@ -1,76 +1,110 @@
 {
   "version": 7,
-  "include": [
-    "CMakeConanPresets.json"
-  ],
   "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_CUDA_ARCHITECTURES": "80;86"
+      }
+    },
+    {
+      "name": "gcc",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_CUDA_COMPILER": "nvcc"
+      }
+    },
+    {
+      "name": "clang",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CUDA_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "gcc-release",
+      "displayName": "GCC Release",
+      "inherits": [
+        "base",
+        "gcc"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "gcc-debug",
+      "displayName": "GCC Debug",
+      "inherits": [
+        "base",
+        "gcc"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "clang-release",
+      "displayName": "Clang Release",
+      "inherits": [
+        "base",
+        "clang"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "clang-debug",
+      "displayName": "Clang Debug",
+      "inherits": [
+        "base",
+        "clang"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
     {
       "name": "dev-base",
       "hidden": true,
+      "inherits": "base",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
         "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
         "CMAKE_CUDA_COMPILER_LAUNCHER": "ccache",
         "CMAKE_LINK_WHAT_YOU_USE": true,
         "CMAKE_CXX_CPPCHECK": "cppcheck",
-        "CMAKE_CXX_INCLUDE_WHAT_YOU_USE": "include-what-you-use"
+        "CMAKE_CXX_INCLUDE_WHAT_YOU_USE": "include-what-you-use",
+        "CMAKE_CUDA_ARCHITECTURES": "86"
       }
     },
     {
-      "name": "clang-warnings",
+      "name": "dev-gcc-warnings",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wshadow -Wuseless-cast",
+        "CMAKE_CUDA_FLAGS": "--Wreorder --Wdefault-stream-launch --Wmissing-launch-bounds --Wext-lambda-captures-this -Xptxas --warn-on-local-memory-usage,--warn-on-spills -Xcompiler -Wall,-Wextra,-Wnon-virtual-dtor,-Wunused,-Wconversion,-Wshadow,-Wuseless-cast "
+      }
+    },
+    {
+      "name": "dev-clang-warnings",
       "hidden": true,
       "cacheVariables": {
         "CMAKE_CXX_CLANG_TIDY": "clang-tidy",
-        "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wsign-conversion -Wshadow",
-        "CMAKE_CUDA_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wsign-conversion -Wshadow -Wnvcc-compat"
+        "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wshadow",
+        "CMAKE_CUDA_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wshadow -Wnvcc-compat"
       }
     },
     {
-      "name": "gcc-nvcc-warnings",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wsign-conversion -Wshadow -Wuseless-cast",
-        "CMAKE_CUDA_FLAGS": "--Wreorder --Wdefault-stream-launch --Wmissing-launch-bounds --Wext-lambda-captures-this -Xptxas --warn-on-local-memory-usage,--warn-on-spills -Xcompiler -Wall,-Wextra,-Wnon-virtual-dtor,-Wunused,-Wconversion,-Wsign-conversion,-Wshadow,-Wuseless-cast "
-      }
-    },
-    {
-      "name": "dev-clang-release",
-      "displayName": "Dev Clang Release",
-      "inherits": [
-        "dev-base",
-        "clang-warnings",
-        "conan-clang-release"
-      ]
-    },
-    {
-      "name": "dev-clang-debug",
-      "displayName": "Dev Clang Debug",
-      "inherits": [
-        "dev-base",
-        "clang-warnings",
-        "conan-clang-debug"
-      ]
-    },
-    {
-      "name": "dev-gcc-release",
-      "displayName": "Dev GCC Release",
-      "inherits": [
-        "dev-base",
-        "gcc-nvcc-warnings",
-        "conan-gcc-release"
-      ]
-    },
-    {
-      "name": "dev-gcc-debug",
-      "displayName": "Dev GCC Debug",
-      "inherits": [
-        "dev-base",
-        "gcc-nvcc-warnings",
-        "conan-gcc-debug"
-      ]
-    },
-    {
-      "name": "clang-sanitizers",
+      "name": "dev-clang-sanitizers",
       "hidden": true,
       "cacheVariables": {
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined,leak -fno-omit-frame-pointer",
@@ -78,25 +112,71 @@
       }
     },
     {
+      "name": "dev-gcc-release",
+      "displayName": "Dev GCC Release",
+      "inherits": [
+        "gcc-release",
+        "dev-base",
+        "dev-gcc-warnings"
+      ]
+    },
+    {
+      "name": "dev-gcc-debug",
+      "displayName": "Dev GCC Debug",
+      "inherits": [
+        "gcc-debug",
+        "dev-base",
+        "dev-gcc-warnings"
+      ]
+    },
+    {
+      "name": "dev-clang-release",
+      "displayName": "Dev Clang Release",
+      "inherits": [
+        "clang-release",
+        "dev-base",
+        "dev-clang-warnings"
+      ]
+    },
+    {
+      "name": "dev-clang-debug",
+      "displayName": "Dev Clang Debug",
+      "inherits": [
+        "clang-debug",
+        "dev-base",
+        "dev-clang-warnings"
+      ]
+    },
+    {
       "name": "dev-clang-release-sanitized",
       "displayName": "Dev Clang Release Sanitized",
       "inherits": [
+        "clang-release",
         "dev-base",
-        "clang-sanitizers",
-        "conan-clang-release"
+        "dev-clang-sanitizers"
       ]
     }
   ],
   "buildPresets": [
     {
-      "name": "dev-clang-release",
-      "displayName": "Dev Clang Release",
-      "configurePreset": "dev-clang-release"
+      "name": "gcc-release",
+      "displayName": "GCC Release",
+      "configurePreset": "gcc-release"
     },
     {
-      "name": "dev-clang-debug",
-      "displayName": "Dev Clang Debug",
-      "configurePreset": "dev-clang-debug"
+      "name": "gcc-debug",
+      "displayName": "GCC Debug",
+      "configurePreset": "gcc-debug"
+    },
+    {
+      "name": "clang-release",
+      "displayName": "Clang Release",
+      "configurePreset": "clang-release"
+    },
+    {
+      "name": "clang-debug",
+      "displayName": "Clang Debug",
+      "configurePreset": "clang-debug"
     },
     {
       "name": "dev-gcc-release",
@@ -109,6 +189,16 @@
       "configurePreset": "dev-gcc-debug"
     },
     {
+      "name": "dev-clang-release",
+      "displayName": "Dev Clang Release",
+      "configurePreset": "dev-clang-release"
+    },
+    {
+      "name": "dev-clang-debug",
+      "displayName": "Dev Clang Debug",
+      "configurePreset": "dev-clang-debug"
+    },
+    {
       "name": "dev-clang-release-sanitized",
       "displayName": "Dev Clang Release Sanitized",
       "configurePreset": "dev-clang-release-sanitized"
@@ -116,30 +206,58 @@
   ],
   "workflowPresets": [
     {
-      "name": "dev-clang-release",
-      "displayName": "Dev Clang Release",
+      "name": "gcc-release",
+      "displayName": "GCC Release",
       "steps": [
         {
           "type": "configure",
-          "name": "dev-clang-release"
+          "name": "gcc-release"
         },
         {
           "type": "build",
-          "name": "dev-clang-release"
+          "name": "gcc-release"
         }
       ]
     },
     {
-      "name": "dev-clang-debug",
-      "displayName": "Dev Clang Debug",
+      "name": "gcc-debug",
+      "displayName": "GCC Debug",
       "steps": [
         {
           "type": "configure",
-          "name": "dev-clang-debug"
+          "name": "gcc-debug"
         },
         {
           "type": "build",
-          "name": "dev-clang-debug"
+          "name": "gcc-debug"
+        }
+      ]
+    },
+    {
+      "name": "clang-release",
+      "displayName": "Clang Release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "clang-release"
+        },
+        {
+          "type": "build",
+          "name": "clang-release"
+        }
+      ]
+    },
+    {
+      "name": "clang-debug",
+      "displayName": "Clang Debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "clang-debug"
+        },
+        {
+          "type": "build",
+          "name": "clang-debug"
         }
       ]
     },
@@ -168,6 +286,34 @@
         {
           "type": "build",
           "name": "dev-gcc-debug"
+        }
+      ]
+    },
+    {
+      "name": "dev-clang-release",
+      "displayName": "Dev Clang Release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "dev-clang-release"
+        },
+        {
+          "type": "build",
+          "name": "dev-clang-release"
+        }
+      ]
+    },
+    {
+      "name": "dev-clang-debug",
+      "displayName": "Dev Clang Debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "dev-clang-debug"
+        },
+        {
+          "type": "build",
+          "name": "dev-clang-debug"
         }
       ]
     },
