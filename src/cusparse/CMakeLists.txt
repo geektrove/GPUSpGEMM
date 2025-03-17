@@ -13,6 +13,8 @@ if(${CMAKE_CUDA_COMPILER_ID} STREQUAL "NVIDIA")
 endif()
 
 target_link_libraries(cusparse PRIVATE utils)
-target_link_libraries(cusparse PRIVATE CUDA::cusparse gsl::gsl-lite fmt::fmt)
+target_link_libraries(cusparse PRIVATE CUDA::cusparse)
+target_link_libraries(cusparse PRIVATE gsl-lite)
+target_link_libraries(cusparse PRIVATE fmt::fmt)
 
 install(TARGETS cusparse)

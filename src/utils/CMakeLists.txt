@@ -10,8 +10,7 @@ target_sources(
            FILES
            include/utils/csr.cuh
            include/utils/utils_cuda.cuh
-           include/utils/utils_cusparse.cuh
-           include/utils/utils.hpp)
+           include/utils/utils_cusparse.cuh)
 
 target_compile_features(utils INTERFACE cxx_std_20 cuda_std_20)
 set_target_properties(
@@ -20,6 +19,7 @@ set_target_properties(
                CUDA_EXTENSIONS OFF
                CUDA_SEPARABLE_COMPILATION ON)
 
-target_link_libraries(utils INTERFACE gsl::gsl-lite fmt::fmt)
+target_link_libraries(utils INTERFACE gsl-lite)
+target_link_libraries(utils INTERFACE fmt::fmt)
 
 install(TARGETS utils FILE_SET pubheaders)

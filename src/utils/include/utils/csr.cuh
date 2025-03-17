@@ -8,9 +8,9 @@
 
 #include <gsl/gsl-lite.hpp>
 
-#include "utils.hpp"
 #include "utils_cuda.cuh"
 
+namespace utils {
 enum class Location : std::uint8_t {
     Host,
     Device,
@@ -31,9 +31,9 @@ struct CSR {
     std::int32_t* cols{};
     T* values{};
 
-    CSR(const std::int32_t nnz, const std::int32_t m, const std::int32_t n)
-        : nnz{nnz}, m{m}, n{n} {
-        const auto bytes = get_csr_byte_size<T>(nnz, m);
+    CSR(const std::int32_t nnz_, const std::int32_t m_, const std::int32_t n_)
+        : nnz{nnz_}, m{m_}, n{n_} {
+        const auto bytes = get_csr_byte_size<T>(nnz_, m_);
         void* ptr{};
         if constexpr (L == Location::Host) {
             CHECK_CUDA(cudaMallocHost(&ptr, bytes));
@@ -41,8 +41,8 @@ struct CSR {
             CHECK_CUDA(cudaMalloc(&ptr, bytes));
         }
         rows_ptr = static_cast<std::int32_t*>(ptr);
-        cols = reinterpret_cast<std::int32_t*>(rows_ptr + m + 1);
-        values = reinterpret_cast<T*>(cols + nnz);
+        cols = reinterpret_cast<std::int32_t*>(rows_ptr + m_ + 1);
+        values = reinterpret_cast<T*>(cols + nnz_);
     }
 
     static auto load_from_filename(const std::string& filename) -> CSR<T, L>
@@ -56,7 +56,7 @@ struct CSR {
             throw std::runtime_error("File " + filename + " is too small");
 
         auto read = [&ifs, &filename](auto* data, std::int32_t size = 1) {
-            const auto bytes = narrow<std::int32_t>(sizeof(*data)) * size;
+            const auto bytes = gsl::narrow_cast<std::int32_t>(sizeof(*data)) * size;
             ifs.read(reinterpret_cast<char*>(data), bytes);
             if (ifs.fail())
                 throw std::runtime_error("Failed to read file " + filename);
@@ -73,7 +73,7 @@ struct CSR {
         read(csr.cols, csr.nnz);
         read(csr.values, csr.nnz);
 
-        if (narrow<unsigned long>(ifs.tellg()) < filesize)
+        if (gsl::narrow_cast<unsigned long>(ifs.tellg()) < filesize)
             throw std::runtime_error("File " + filename + " is too large");
 
         return csr;
@@ -87,7 +87,7 @@ struct CSR {
             throw std::runtime_error("Failed to open file " + filename);
 
         auto write = [&ofs](const auto* data, std::int32_t size = 1) {
-            const auto bytes = narrow<std::int32_t>(sizeof(*data)) * size;
+            const auto bytes = gsl::narrow_cast<std::int32_t>(sizeof(*data)) * size;
             ofs.write(reinterpret_cast<const char*>(data), bytes);
             if (ofs.fail())
                 throw std::runtime_error("Failed to write to file");
@@ -128,3 +128,4 @@ struct CSR {
         values = nullptr;
     }
 };
+} // namespace utils

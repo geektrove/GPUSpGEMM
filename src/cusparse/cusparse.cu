@@ -7,9 +7,10 @@
 #include <gsl/gsl-lite.hpp>
 
 #include <utils/csr.cuh>
-#include <utils/utils.hpp>
 #include <utils/utils_cuda.cuh>
 #include <utils/utils_cusparse.cuh>
+
+using namespace utils;
 
 template<std::floating_point T>
 auto get_nips_square(const CSR<T, Location::Device>& a) -> int64_t {
