@@ -4,7 +4,7 @@
 #include "cuda_common.h"
 #include "define.h"
 
-__global__ void __launch_bounds__(1024, 2) k_compute_flop(const mint* __restrict__ d_arpt,
+__launch_bounds__(1024, 2) __global__ void k_compute_flop(const mint* __restrict__ d_arpt,
                                                           const mint* __restrict__ d_acol,
                                                           const mint* __restrict__ d_brpt,
                                                           mint M,

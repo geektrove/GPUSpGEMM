@@ -5,14 +5,14 @@
 #include "define.h"
 
 // good pwarp
-__global__ void __launch_bounds__(PWARP_BLOCK_SIZE, 2)
-    k_symbolic_shared_hash_pwarp(const mint* __restrict__ d_arpt,
-                                 const mint* __restrict__ d_acol,
-                                 const mint* __restrict__ d_brpt,
-                                 const mint* __restrict__ d_bcol,
-                                 mint* __restrict__ d_bins,
-                                 mint bin_size,
-                                 mint* __restrict__ d_row_nnz) {
+__launch_bounds__(PWARP_BLOCK_SIZE, 2) __global__
+    void k_symbolic_shared_hash_pwarp(const mint* __restrict__ d_arpt,
+                                      const mint* __restrict__ d_acol,
+                                      const mint* __restrict__ d_brpt,
+                                      const mint* __restrict__ d_bcol,
+                                      mint* __restrict__ d_bins,
+                                      mint bin_size,
+                                      mint* __restrict__ d_row_nnz) {
     mint i = threadIdx.x + blockIdx.x * blockDim.x;
     mint tid = threadIdx.x & (PWARP - 1);
     mint rid = i / PWARP;
@@ -78,13 +78,13 @@ __global__ void __launch_bounds__(PWARP_BLOCK_SIZE, 2)
 }
 
 template<int SH_ROW>
-__global__ void __launch_bounds__(1024, 2)
-    k_symbolic_shared_hash_tb(const mint* __restrict__ d_arpt,
-                              const mint* __restrict__ d_acol,
-                              const mint* __restrict__ d_brpt,
-                              const mint* __restrict__ d_bcol,
-                              mint* __restrict__ d_bins,
-                              mint* __restrict__ d_row_nnz) {
+__launch_bounds__(1024, 2) __global__
+    void k_symbolic_shared_hash_tb(const mint* __restrict__ d_arpt,
+                                   const mint* __restrict__ d_acol,
+                                   const mint* __restrict__ d_brpt,
+                                   const mint* __restrict__ d_bcol,
+                                   mint* __restrict__ d_bins,
+                                   mint* __restrict__ d_row_nnz) {
     //long long t0 = clock64();
 
     mint tid = threadIdx.x & (WSIZE - 1);
@@ -144,13 +144,13 @@ __global__ void __launch_bounds__(1024, 2)
     }
 }
 
-__global__ void __launch_bounds__(1024, 2)
-    k_symbolic_large_shared_hash_tb(const mint* __restrict__ d_arpt,
-                                    const mint* __restrict__ d_acol,
-                                    const mint* __restrict__ d_brpt,
-                                    const mint* __restrict__ d_bcol,
-                                    mint* __restrict__ d_bins,
-                                    mint* __restrict__ d_row_nnz) {
+__launch_bounds__(1024, 2) __global__
+    void k_symbolic_large_shared_hash_tb(const mint* __restrict__ d_arpt,
+                                         const mint* __restrict__ d_acol,
+                                         const mint* __restrict__ d_brpt,
+                                         const mint* __restrict__ d_bcol,
+                                         mint* __restrict__ d_bins,
+                                         mint* __restrict__ d_row_nnz) {
     mint tid = threadIdx.x & (WSIZE - 1);
     mint wid = threadIdx.x / WSIZE;
     mint wnum = blockDim.x / WSIZE;
@@ -211,15 +211,15 @@ __global__ void __launch_bounds__(1024, 2)
     }
 }
 
-__global__ void __launch_bounds__(1024, 1)
-    k_symbolic_max_shared_hash_tb_with_fail(const mint* __restrict__ d_arpt,
-                                            const mint* __restrict__ d_acol,
-                                            const mint* __restrict__ d_brpt,
-                                            const mint* __restrict__ d_bcol,
-                                            mint* __restrict__ d_bins,
-                                            mint* __restrict__ d_fail_bins,
-                                            mint* __restrict__ d_fail_bin_size,
-                                            mint* __restrict__ d_row_nnz) {
+__launch_bounds__(1024, 1) __global__
+    void k_symbolic_max_shared_hash_tb_with_fail(const mint* __restrict__ d_arpt,
+                                                 const mint* __restrict__ d_acol,
+                                                 const mint* __restrict__ d_brpt,
+                                                 const mint* __restrict__ d_bcol,
+                                                 mint* __restrict__ d_bins,
+                                                 mint* __restrict__ d_fail_bins,
+                                                 mint* __restrict__ d_fail_bin_size,
+                                                 mint* __restrict__ d_row_nnz) {
     mint tid = threadIdx.x & (WSIZE - 1);
     mint wid = threadIdx.x / WSIZE;
     mint wnum = blockDim.x / WSIZE;
@@ -288,15 +288,15 @@ __global__ void __launch_bounds__(1024, 1)
     }
 }
 
-__global__ void __launch_bounds__(1024, 2)
-    k_symbolic_global_hash_tb(const mint* __restrict__ d_arpt,
-                              const mint* __restrict__ d_acol,
-                              const mint* __restrict__ d_brpt,
-                              const mint* __restrict__ d_bcol,
-                              mint* __restrict__ d_bins,
-                              mint* __restrict__ d_row_nnz,
-                              mint* __restrict__ d_table,
-                              mint max_tsize) {
+__launch_bounds__(1024, 2) __global__
+    void k_symbolic_global_hash_tb(const mint* __restrict__ d_arpt,
+                                   const mint* __restrict__ d_acol,
+                                   const mint* __restrict__ d_brpt,
+                                   const mint* __restrict__ d_bcol,
+                                   mint* __restrict__ d_bins,
+                                   mint* __restrict__ d_row_nnz,
+                                   mint* __restrict__ d_table,
+                                   mint max_tsize) {
     mint tid = threadIdx.x & (WSIZE - 1);
     mint wid = threadIdx.x / WSIZE;
     mint wnum = blockDim.x / WSIZE;

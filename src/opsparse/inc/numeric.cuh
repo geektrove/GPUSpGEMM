@@ -5,18 +5,18 @@
 #include "define.h"
 
 // full occu
-__global__ void __launch_bounds__(NUMERIC_PWARP_BLOCK_SIZE, 2)
-    k_numeric_shared_hash_pwarp(const mint* __restrict__ d_arpt,
-                                const mint* __restrict__ d_acol,
-                                const mdouble* __restrict__ d_aval,
-                                const mint* __restrict__ d_brpt,
-                                const mint* __restrict__ d_bcol,
-                                const mdouble* __restrict__ d_bval,
-                                mint* d_bins,
-                                mint bin_size,
-                                mint* d_crpt,
-                                mint* d_ccol,
-                                mdouble* d_cval) {
+__launch_bounds__(NUMERIC_PWARP_BLOCK_SIZE, 2) __global__
+    void k_numeric_shared_hash_pwarp(const mint* __restrict__ d_arpt,
+                                     const mint* __restrict__ d_acol,
+                                     const mdouble* __restrict__ d_aval,
+                                     const mint* __restrict__ d_brpt,
+                                     const mint* __restrict__ d_bcol,
+                                     const mdouble* __restrict__ d_bval,
+                                     mint* d_bins,
+                                     mint bin_size,
+                                     mint* d_crpt,
+                                     mint* d_ccol,
+                                     mdouble* d_cval) {
     //long long t0 = clock64();
 
     mint i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -142,17 +142,17 @@ __global__ void __launch_bounds__(NUMERIC_PWARP_BLOCK_SIZE, 2)
 }
 
 template<int SH_ROW, int BS>
-__global__ void __launch_bounds__(1024, 2)
-    k_numeric_shared_hash_tb_full_occu(const mint* __restrict__ d_arpt,
-                                       const mint* __restrict__ d_acol,
-                                       const mdouble* __restrict__ d_aval,
-                                       const mint* __restrict__ d_brpt,
-                                       const mint* __restrict__ d_bcol,
-                                       const mdouble* __restrict__ d_bval,
-                                       mint* d_bins,
-                                       mint* d_crpt,
-                                       mint* d_ccol,
-                                       mdouble* d_cval) {
+__launch_bounds__(1024, 2) __global__
+    void k_numeric_shared_hash_tb_full_occu(const mint* __restrict__ d_arpt,
+                                            const mint* __restrict__ d_acol,
+                                            const mdouble* __restrict__ d_aval,
+                                            const mint* __restrict__ d_brpt,
+                                            const mint* __restrict__ d_bcol,
+                                            const mdouble* __restrict__ d_bval,
+                                            mint* d_bins,
+                                            mint* d_crpt,
+                                            mint* d_ccol,
+                                            mdouble* d_cval) {
     //long long t0 = clock64();
 
     mint tid = threadIdx.x & (WSIZE - 1);
@@ -264,17 +264,17 @@ __global__ void __launch_bounds__(1024, 2)
 }
 
 // half occu due to max shared memory
-__global__ void __launch_bounds__(1024, 1)
-    k_numeric_max_shared_hash_tb_half_occu(const mint* __restrict__ d_arpt,
-                                           const mint* __restrict__ d_acol,
-                                           const mdouble* __restrict__ d_aval,
-                                           const mint* __restrict__ d_brpt,
-                                           const mint* __restrict__ d_bcol,
-                                           const mdouble* __restrict__ d_bval,
-                                           mint* d_bins,
-                                           mint* d_crpt,
-                                           mint* d_ccol,
-                                           mdouble* d_cval) {
+__launch_bounds__(1024, 1) __global__
+    void k_numeric_max_shared_hash_tb_half_occu(const mint* __restrict__ d_arpt,
+                                                const mint* __restrict__ d_acol,
+                                                const mdouble* __restrict__ d_aval,
+                                                const mint* __restrict__ d_brpt,
+                                                const mint* __restrict__ d_bcol,
+                                                const mdouble* __restrict__ d_bval,
+                                                mint* d_bins,
+                                                mint* d_crpt,
+                                                mint* d_ccol,
+                                                mdouble* d_cval) {
     //long long t0 = clock64();
 
     mint tid = threadIdx.x & (WSIZE - 1);
@@ -384,19 +384,19 @@ __global__ void __launch_bounds__(1024, 1)
     //}
 }
 
-__global__ void __launch_bounds__(1024, 2)
-    k_numeric_global_hash_tb_full_occu(const mint* __restrict__ d_arpt,
-                                       const mint* __restrict__ d_acol,
-                                       const mdouble* __restrict__ d_aval,
-                                       const mint* __restrict__ d_brpt,
-                                       const mint* __restrict__ d_bcol,
-                                       const mdouble* __restrict__ d_bval,
-                                       mint* d_bins,
-                                       mint max_tsize,
-                                       mint* d_tables,
-                                       mint* d_crpt,
-                                       mint* d_ccol,
-                                       mdouble* d_cval) {
+__launch_bounds__(1024, 2) __global__
+    void k_numeric_global_hash_tb_full_occu(const mint* __restrict__ d_arpt,
+                                            const mint* __restrict__ d_acol,
+                                            const mdouble* __restrict__ d_aval,
+                                            const mint* __restrict__ d_brpt,
+                                            const mint* __restrict__ d_bcol,
+                                            const mdouble* __restrict__ d_bval,
+                                            mint* d_bins,
+                                            mint max_tsize,
+                                            mint* d_tables,
+                                            mint* d_crpt,
+                                            mint* d_ccol,
+                                            mdouble* d_cval) {
     //long long t0 = clock64();
 
     mint tid = threadIdx.x & (WSIZE - 1);
