@@ -77,7 +77,7 @@ auto get_nip(const CSR<T, Location::Device>& a, const CSR<T, Location::Device>& 
                                       &buffer1_size,
                                       nullptr));
     void* buffer1{};
-    CHECK_CUDA(cudaMalloc(&buffer1, buffer1_size));
+    handle_cuda_error(cudaMalloc(&buffer1, buffer1_size));
     utils::handle_cusparse_error(
         cusparseSpGEMM_workEstimation(handle,
                                       CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -98,7 +98,7 @@ auto get_nip(const CSR<T, Location::Device>& a, const CSR<T, Location::Device>& 
     utils::handle_cusparse_error(cusparseSpGEMM_getNumProducts(spgemm_desc, &nip));
 
     // Clean up
-    CHECK_CUDA(cudaFree(buffer1));
+    handle_cuda_error(cudaFree(buffer1));
     utils::handle_cusparse_error(cusparseSpGEMM_destroyDescr(spgemm_desc));
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_c));
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_b));

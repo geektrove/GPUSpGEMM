@@ -5,26 +5,25 @@
 #include <cusparse.h>
 #include <fmt/core.h>
 
-#define CHECK_CUDA(value) utils::check_cuda_error((value), #value, __FILE__, __LINE__)
-#define CHECK_LAST_CUDA() utils::check_last_cuda_error(__FILE__, __LINE__)
-
 namespace utils {
 
-inline auto check_cuda_error(const cudaError_t error,
-                             const char* const function,
-                             const char* const file,
-                             const int line) -> void {
-    if (error == cudaSuccess)
+inline auto handle_cuda_error(
+    const cudaError_t status,
+    const std::source_location location = std::source_location::current()) -> void {
+    if (status == cudaSuccess)
         return;
-    const auto* reason{cudaGetErrorString(error)};
-    const auto message{
-        fmt::format("CUDA error ({}:{}:{}): {}\n", file, line, function, reason)};
-    throw std::runtime_error(message);
+    const auto* reason{cudaGetErrorString(status)};
+    throw std::runtime_error(fmt::format("CUDA error ({}:{}:{}): {}\n",
+                                         location.file_name(),
+                                         location.line(),
+                                         location.function_name(),
+                                         reason));
 }
 
-inline auto check_last_cuda_error(const char* const file, const int line) -> void {
+inline auto handle_last_cuda_error(
+    const std::source_location location = std::source_location::current()) -> void {
     const cudaError_t error{cudaGetLastError()};
-    check_cuda_error(error, "LAST CUDA ERROR", file, line);
+    handle_cuda_error(error, location);
 }
 
 inline auto handle_cusparse_error(

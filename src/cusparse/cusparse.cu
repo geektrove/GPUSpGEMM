@@ -85,7 +85,7 @@ auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<
                                       &buffer1_size,
                                       nullptr));
     void* buffer1{};
-    CHECK_CUDA(cudaMalloc(&buffer1, buffer1_size));
+    utils::handle_cuda_error(cudaMalloc(&buffer1, buffer1_size));
     utils::handle_cusparse_error(
         cusparseSpGEMM_workEstimation(handle,
                                       CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -117,7 +117,7 @@ auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<
                                                         &buffer2_size,
                                                         nullptr));
     void* buffer2{};
-    CHECK_CUDA(cudaMalloc(&buffer2, buffer2_size));
+    utils::handle_cuda_error(cudaMalloc(&buffer2, buffer2_size));
     utils::handle_cusparse_error(cusparseSpGEMM_compute(handle,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -159,8 +159,8 @@ auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<
                                                      spgemm_desc));
 
     // Clean up
-    CHECK_CUDA(cudaFree(buffer2));
-    CHECK_CUDA(cudaFree(buffer1));
+    utils::handle_cuda_error(cudaFree(buffer2));
+    utils::handle_cuda_error(cudaFree(buffer1));
     utils::handle_cusparse_error(cusparseSpGEMM_destroyDescr(spgemm_desc));
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_c));
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_b));

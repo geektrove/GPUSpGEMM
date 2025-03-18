@@ -60,9 +60,9 @@ CSR<T, L>::CSR(const std::int32_t nnz_, const std::int32_t m_, const std::int32_
     const auto bytes = get_csr_byte_size<T>(nnz_, m_);
     void* ptr{};
     if constexpr (L == Location::Host) {
-        CHECK_CUDA(cudaMallocHost(&ptr, bytes));
+        handle_cuda_error(cudaMallocHost(&ptr, bytes));
     } else {
-        CHECK_CUDA(cudaMalloc(&ptr, bytes));
+        handle_cuda_error(cudaMalloc(&ptr, bytes));
     }
     rows_ptr = static_cast<std::int32_t*>(ptr);
     cols = rows_ptr + m_ + 1;
@@ -74,17 +74,19 @@ CSR<T, L>::CSR(const CSR& other) : nnz{other.nnz}, m{other.m}, n{other.n} {
     const auto bytes = get_csr_byte_size<T>(nnz, m);
     void* ptr{};
     if constexpr (L == Location::Host) {
-        CHECK_CUDA(cudaMallocHost(&ptr, bytes));
+        handle_cuda_error(cudaMallocHost(&ptr, bytes));
     } else {
-        CHECK_CUDA(cudaMalloc(&ptr, bytes));
+        handle_cuda_error(cudaMalloc(&ptr, bytes));
     }
     rows_ptr = static_cast<std::int32_t*>(ptr);
     cols = rows_ptr + m + 1;
     values = reinterpret_cast<T*>(cols + nnz);
     if constexpr (L == Location::Host)
-        CHECK_CUDA(cudaMemcpy(rows_ptr, other.rows_ptr, bytes, cudaMemcpyHostToHost));
+        handle_cuda_error(
+            cudaMemcpy(rows_ptr, other.rows_ptr, bytes, cudaMemcpyHostToHost));
     else
-        CHECK_CUDA(cudaMemcpy(rows_ptr, other.rows_ptr, bytes, cudaMemcpyDeviceToDevice));
+        handle_cuda_error(
+            cudaMemcpy(rows_ptr, other.rows_ptr, bytes, cudaMemcpyDeviceToDevice));
 }
 
 template<std::floating_point T, Location L>
@@ -188,9 +190,11 @@ auto CSR<T, L>::to() const -> CSR<T, To> {
     CSR<T, To> csr(nnz, m, n);
     const auto bytes = get_csr_byte_size<T>(nnz, m);
     if constexpr (To == Location::Device) {
-        CHECK_CUDA(cudaMemcpy(csr.rows_ptr, rows_ptr, bytes, cudaMemcpyHostToDevice));
+        handle_cuda_error(
+            cudaMemcpy(csr.rows_ptr, rows_ptr, bytes, cudaMemcpyHostToDevice));
     } else {
-        CHECK_CUDA(cudaMemcpy(csr.rows_ptr, rows_ptr, bytes, cudaMemcpyDeviceToHost));
+        handle_cuda_error(
+            cudaMemcpy(csr.rows_ptr, rows_ptr, bytes, cudaMemcpyDeviceToHost));
     }
     return csr;
 }
@@ -209,9 +213,9 @@ auto swap(CSR<T, L>& lhs, CSR<T, L>& rhs) noexcept -> void {
 template<std::floating_point T, Location L>
 auto CSR<T, L>::free() -> void {
     if constexpr (L == Location::Host) {
-        CHECK_CUDA(cudaFreeHost(rows_ptr));
+        handle_cuda_error(cudaFreeHost(rows_ptr));
     } else {
-        CHECK_CUDA(cudaFree(rows_ptr));
+        handle_cuda_error(cudaFree(rows_ptr));
     }
     nnz = 0;
     m = 0;
