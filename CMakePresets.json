@@ -79,11 +79,7 @@
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
         "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
-        "CMAKE_CUDA_COMPILER_LAUNCHER": "ccache",
-        "CMAKE_LINK_WHAT_YOU_USE": true,
-        "CMAKE_CXX_CPPCHECK": "cppcheck",
-        "CMAKE_CXX_INCLUDE_WHAT_YOU_USE": "include-what-you-use",
-        "CMAKE_CUDA_ARCHITECTURES": "86"
+        "CMAKE_CUDA_COMPILER_LAUNCHER": "ccache"
       }
     },
     {
@@ -98,7 +94,6 @@
       "name": "dev-clang-warnings",
       "hidden": true,
       "cacheVariables": {
-        "CMAKE_CXX_CLANG_TIDY": "clang-tidy",
         "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wshadow",
         "CMAKE_CUDA_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wshadow -Wnvcc-compat"
       }
