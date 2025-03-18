@@ -34,14 +34,6 @@ inline static void checkCUDA(cudaError_t err,
 #define CHECK_CUDA(err) (checkCUDA(err, __FILE__, __LINE__))
 #define CHECK_ERROR(err) (checkCUDA(err, __FILE__, __LINE__))
 
-inline void CHECK_CUSPARSE(cusparseStatus_t status, std::string errorMsg="")
-{
-	if (status != CUSPARSE_STATUS_SUCCESS) {
-		std::cout << "CuSparse error: " << errorMsg << std::endl;
-		throw std::exception();
-	}
-}
-
 #define HP_TIMING_NOW(Var) \
   ({ unsigned int _hi, _lo; \
      asm volatile ("lfence\n\trdtsc" : "=a" (_lo), "=d" (_hi)); \
