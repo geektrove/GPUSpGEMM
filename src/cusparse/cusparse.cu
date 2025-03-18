@@ -3,14 +3,20 @@
 
 #include <cuda_runtime_api.h>
 #include <cusparse.h>
+#include <fmt/base.h>
 #include <fmt/core.h>
 #include <gsl/gsl-lite.hpp>
 
 #include <utils/utils.cuh>
 
-using namespace utils;
+template<std::floating_point T>
+using HostCSR = utils::CSR<T, utils::Location::Host>;
+template<std::floating_point T>
+using DeviceCSR = utils::CSR<T, utils::Location::Device>;
 
 #define CHECK_CUSPARSE(value) check_cusparse_error((value), #value, __FILE__, __LINE__)
+
+namespace {
 
 auto check_cusparse_error(const cusparseStatus_t status,
                           const char* const function,
@@ -25,7 +31,7 @@ auto check_cusparse_error(const cusparseStatus_t status,
 }
 
 template<std::floating_point T>
-auto get_nips_square(const CSR<T, Location::Device>& a) -> int64_t {
+auto get_nip(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> int64_t {
     // Initialize cuSPARSE
     cusparseHandle_t handle{};
     CHECK_CUSPARSE(cusparseCreate(&handle));
@@ -43,10 +49,22 @@ auto get_nips_square(const CSR<T, Location::Device>& a) -> int64_t {
                                      CUSPARSE_INDEX_32I,
                                      CUSPARSE_INDEX_BASE_ZERO,
                                      CUDA_R_64F));
+    cusparseSpMatDescr_t desc_b{};
+    CHECK_CUSPARSE(cusparseCreateCsr(&desc_b,
+                                     b.m,
+                                     b.n,
+                                     b.nnz,
+                                     b.rows_ptr,
+                                     b.cols,
+                                     b.values,
+                                     CUSPARSE_INDEX_32I,
+                                     CUSPARSE_INDEX_32I,
+                                     CUSPARSE_INDEX_BASE_ZERO,
+                                     CUDA_R_64F));
     cusparseSpMatDescr_t desc_c{};
     CHECK_CUSPARSE(cusparseCreateCsr(&desc_c,
                                      a.m,
-                                     a.n,
+                                     b.n,
                                      0,
                                      nullptr,
                                      nullptr,
@@ -71,7 +89,7 @@ auto get_nips_square(const CSR<T, Location::Device>& a) -> int64_t {
                                                  CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                  &alpha,
                                                  desc_a,
-                                                 desc_a,
+                                                 desc_b,
                                                  &beta,
                                                  desc_c,
                                                  CUDA_R_64F,
@@ -86,7 +104,7 @@ auto get_nips_square(const CSR<T, Location::Device>& a) -> int64_t {
                                                  CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                  &alpha,
                                                  desc_a,
-                                                 desc_a,
+                                                 desc_b,
                                                  &beta,
                                                  desc_c,
                                                  CUDA_R_64F,
@@ -103,6 +121,7 @@ auto get_nips_square(const CSR<T, Location::Device>& a) -> int64_t {
     CHECK_CUDA(cudaFree(buffer1));
     CHECK_CUSPARSE(cusparseSpGEMM_destroyDescr(spgemm_desc));
     CHECK_CUSPARSE(cusparseDestroySpMat(desc_c));
+    CHECK_CUSPARSE(cusparseDestroySpMat(desc_b));
     CHECK_CUSPARSE(cusparseDestroySpMat(desc_a));
     CHECK_CUSPARSE(cusparseDestroy(handle));
 
@@ -110,8 +129,7 @@ auto get_nips_square(const CSR<T, Location::Device>& a) -> int64_t {
 }
 
 template<std::floating_point T>
-auto spgemm_cusparse_square(const CSR<T, Location::Device>& a)
-    -> CSR<T, Location::Device> {
+auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<T> {
     // Initialize cuSPARSE
     cusparseHandle_t handle{};
     CHECK_CUSPARSE(cusparseCreate(&handle));
@@ -129,10 +147,22 @@ auto spgemm_cusparse_square(const CSR<T, Location::Device>& a)
                                      CUSPARSE_INDEX_32I,
                                      CUSPARSE_INDEX_BASE_ZERO,
                                      CUDA_R_64F));
+    cusparseSpMatDescr_t desc_b{};
+    CHECK_CUSPARSE(cusparseCreateCsr(&desc_b,
+                                     b.m,
+                                     b.n,
+                                     b.nnz,
+                                     b.rows_ptr,
+                                     b.cols,
+                                     b.values,
+                                     CUSPARSE_INDEX_32I,
+                                     CUSPARSE_INDEX_32I,
+                                     CUSPARSE_INDEX_BASE_ZERO,
+                                     CUDA_R_64F));
     cusparseSpMatDescr_t desc_c{};
     CHECK_CUSPARSE(cusparseCreateCsr(&desc_c,
                                      a.m,
-                                     a.n,
+                                     b.n,
                                      0,
                                      nullptr,
                                      nullptr,
@@ -157,7 +187,7 @@ auto spgemm_cusparse_square(const CSR<T, Location::Device>& a)
                                                  CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                  &alpha,
                                                  desc_a,
-                                                 desc_a,
+                                                 desc_b,
                                                  &beta,
                                                  desc_c,
                                                  CUDA_R_64F,
@@ -172,7 +202,7 @@ auto spgemm_cusparse_square(const CSR<T, Location::Device>& a)
                                                  CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                  &alpha,
                                                  desc_a,
-                                                 desc_a,
+                                                 desc_b,
                                                  &beta,
                                                  desc_c,
                                                  CUDA_R_64F,
@@ -188,7 +218,7 @@ auto spgemm_cusparse_square(const CSR<T, Location::Device>& a)
                                           CUSPARSE_OPERATION_NON_TRANSPOSE,
                                           &alpha,
                                           desc_a,
-                                          desc_a,
+                                          desc_b,
                                           &beta,
                                           desc_c,
                                           CUDA_R_64F,
@@ -203,7 +233,7 @@ auto spgemm_cusparse_square(const CSR<T, Location::Device>& a)
                                           CUSPARSE_OPERATION_NON_TRANSPOSE,
                                           &alpha,
                                           desc_a,
-                                          desc_a,
+                                          desc_b,
                                           &beta,
                                           desc_c,
                                           CUDA_R_64F,
@@ -219,9 +249,9 @@ auto spgemm_cusparse_square(const CSR<T, Location::Device>& a)
     CHECK_CUSPARSE(cusparseSpMatGetSize(desc_c, &m_c, &n_c, &nnz_c));
 
     // Allocate the result matrix
-    CSR<double, Location::Device> d_c(gsl::narrow_cast<std::int32_t>(nnz_c),
-                                      gsl::narrow_cast<std::int32_t>(m_c),
-                                      gsl::narrow_cast<std::int32_t>(n_c));
+    DeviceCSR<T> d_c(gsl::narrow_cast<std::int32_t>(nnz_c),
+                     gsl::narrow_cast<std::int32_t>(m_c),
+                     gsl::narrow_cast<std::int32_t>(n_c));
 
     // Extract the result matrix
     CHECK_CUSPARSE(cusparseCsrSetPointers(desc_c, d_c.rows_ptr, d_c.cols, d_c.values));
@@ -230,7 +260,7 @@ auto spgemm_cusparse_square(const CSR<T, Location::Device>& a)
                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
                                        &alpha,
                                        desc_a,
-                                       desc_a,
+                                       desc_b,
                                        &beta,
                                        desc_c,
                                        CUDA_R_64F,
@@ -242,35 +272,37 @@ auto spgemm_cusparse_square(const CSR<T, Location::Device>& a)
     CHECK_CUDA(cudaFree(buffer1));
     CHECK_CUSPARSE(cusparseSpGEMM_destroyDescr(spgemm_desc));
     CHECK_CUSPARSE(cusparseDestroySpMat(desc_c));
+    CHECK_CUSPARSE(cusparseDestroySpMat(desc_b));
     CHECK_CUSPARSE(cusparseDestroySpMat(desc_a));
     CHECK_CUSPARSE(cusparseDestroy(handle));
 
     return d_c;
 }
 
+} // namespace
+
 auto main(int argc, char** argv) -> int {
-    if (argc != 3) {
-        fmt::println("Usage: {} <input> <output>", argv[0]);
+    if (argc != 4) {
+        fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
         return EXIT_FAILURE;
     }
-    const auto* input = argv[1];
-    const auto* output = argv[2];
+    auto h_a = HostCSR<double>::load_from_filename(argv[1]);
+    auto h_b = HostCSR<double>::load_from_filename(argv[2]);
+    if (h_a.n != h_b.m) {
+        fmt::println("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
+        return EXIT_FAILURE;
+    }
 
-    auto h_a = CSR<double, Location::Host>::load_from_filename(input);
-    auto d_a = h_a.to<Location::Device>();
+    auto d_a = h_a.to<utils::Location::Device>();
+    auto d_b = h_b.to<utils::Location::Device>();
 
-    const auto nip = get_nips_square(d_a);
+    const auto nip = get_nip(d_a, d_b);
     fmt::print("Number of intermediate products: {}\n", nip);
 
-    auto d_c = spgemm_cusparse_square(d_a);
+    auto d_c = spgemm_cusparse(d_a, d_b);
+    auto h_c = d_c.to<utils::Location::Host>();
 
-    auto h_c = d_c.to<Location::Host>();
-    h_c.save_to_filename(output);
-
-    h_a.free();
-    d_a.free();
-    d_c.free();
-    h_c.free();
+    h_c.save_to_filename(argv[3]);
 
     return EXIT_SUCCESS;
 }
