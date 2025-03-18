@@ -21,5 +21,3 @@ set_target_properties(
 
 target_link_libraries(utils INTERFACE gsl-lite)
 target_link_libraries(utils INTERFACE fmt::fmt)
-
-install(TARGETS utils FILE_SET pubheaders)

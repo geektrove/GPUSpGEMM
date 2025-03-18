@@ -16,5 +16,3 @@ target_link_libraries(cusparse PRIVATE utils)
 target_link_libraries(cusparse PRIVATE CUDA::cusparse)
 target_link_libraries(cusparse PRIVATE gsl-lite)
 target_link_libraries(cusparse PRIVATE fmt::fmt)
-
-install(TARGETS cusparse)
