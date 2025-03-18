@@ -1,23 +1,15 @@
-#include <concepts>
-#include <cstdlib>
+#pragma once
 
-#include <cuda_runtime_api.h>
 #include <cusparse.h>
-#include <fmt/base.h>
-#include <fmt/core.h>
-#include <gsl/gsl-lite.hpp>
 
-#include <utils/utils.cuh>
+#include <utils/csr.cuh>
+#include <utils/errors.cuh>
 
-template<std::floating_point T>
-using HostCSR = utils::CSR<T, utils::Location::Host>;
-template<std::floating_point T>
-using DeviceCSR = utils::CSR<T, utils::Location::Device>;
-
-namespace {
+namespace utils {
 
 template<std::floating_point T>
-auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<T> {
+auto get_nip(const CSR<T, Location::Device>& a, const CSR<T, Location::Device>& b)
+    -> int64_t {
     // Initialize cuSPARSE
     cusparseHandle_t handle{};
     utils::handle_cusparse_error(cusparseCreate(&handle));
@@ -101,65 +93,11 @@ auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<
                                       &buffer1_size,
                                       buffer1));
 
-    // Second stage
-    size_t buffer2_size{};
-    utils::handle_cusparse_error(cusparseSpGEMM_compute(handle,
-                                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        &alpha,
-                                                        desc_a,
-                                                        desc_b,
-                                                        &beta,
-                                                        desc_c,
-                                                        CUDA_R_64F,
-                                                        CUSPARSE_SPGEMM_DEFAULT,
-                                                        spgemm_desc,
-                                                        &buffer2_size,
-                                                        nullptr));
-    void* buffer2{};
-    CHECK_CUDA(cudaMalloc(&buffer2, buffer2_size));
-    utils::handle_cusparse_error(cusparseSpGEMM_compute(handle,
-                                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        &alpha,
-                                                        desc_a,
-                                                        desc_b,
-                                                        &beta,
-                                                        desc_c,
-                                                        CUDA_R_64F,
-                                                        CUSPARSE_SPGEMM_DEFAULT,
-                                                        spgemm_desc,
-                                                        &buffer2_size,
-                                                        buffer2));
-
-    // Extract the result matrix size
-    int64_t m_c{};
-    int64_t n_c{};
-    int64_t nnz_c{};
-    utils::handle_cusparse_error(cusparseSpMatGetSize(desc_c, &m_c, &n_c, &nnz_c));
-
-    // Allocate the result matrix
-    DeviceCSR<T> d_c(gsl::narrow_cast<std::int32_t>(nnz_c),
-                     gsl::narrow_cast<std::int32_t>(m_c),
-                     gsl::narrow_cast<std::int32_t>(n_c));
-
-    // Extract the result matrix
-    utils::handle_cusparse_error(
-        cusparseCsrSetPointers(desc_c, d_c.rows_ptr, d_c.cols, d_c.values));
-    utils::handle_cusparse_error(cusparseSpGEMM_copy(handle,
-                                                     CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                     CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                     &alpha,
-                                                     desc_a,
-                                                     desc_b,
-                                                     &beta,
-                                                     desc_c,
-                                                     CUDA_R_64F,
-                                                     CUSPARSE_SPGEMM_DEFAULT,
-                                                     spgemm_desc));
+    // Extract the number of intermediate products
+    int64_t nip{};
+    utils::handle_cusparse_error(cusparseSpGEMM_getNumProducts(spgemm_desc, &nip));
 
     // Clean up
-    CHECK_CUDA(cudaFree(buffer2));
     CHECK_CUDA(cudaFree(buffer1));
     utils::handle_cusparse_error(cusparseSpGEMM_destroyDescr(spgemm_desc));
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_c));
@@ -167,33 +105,7 @@ auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_a));
     utils::handle_cusparse_error(cusparseDestroy(handle));
 
-    return d_c;
+    return nip;
 }
 
-} // namespace
-
-auto main(int argc, char** argv) -> int {
-    if (argc != 4) {
-        fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
-        return EXIT_FAILURE;
-    }
-    auto h_a = HostCSR<double>::load_from_filename(argv[1]);
-    auto h_b = HostCSR<double>::load_from_filename(argv[2]);
-    if (h_a.n != h_b.m) {
-        fmt::println("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
-        return EXIT_FAILURE;
-    }
-
-    auto d_a = h_a.to<utils::Location::Device>();
-    auto d_b = h_b.to<utils::Location::Device>();
-
-    const auto nip = get_nip(d_a, d_b);
-    fmt::print("Number of intermediate products: {}\n", nip);
-
-    auto d_c = spgemm_cusparse(d_a, d_b);
-    auto h_c = d_c.to<utils::Location::Host>();
-
-    h_c.save_to_filename(argv[3]);
-
-    return EXIT_SUCCESS;
-}
+} // namespace utils
