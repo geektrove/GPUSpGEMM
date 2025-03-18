@@ -4,8 +4,8 @@
 #include "cuda_common.h"
 #include "define.h"
 
-__global__ void __launch_bounds__(1024, 2)
-    k_symbolic_binning(mint* d_row_flop, int M, mint* d_bin_size) {
+__launch_bounds__(1024, 2) __global__
+    void k_symbolic_binning(mint* d_row_flop, int M, mint* d_bin_size) {
     __shared__ mint shared_bin_size[NUM_BIN];
     if (threadIdx.x < NUM_BIN) {
         shared_bin_size[threadIdx.x] = 0;
@@ -34,12 +34,12 @@ before_end:
     }
 }
 
-__global__ void __launch_bounds__(1024, 2)
-    k_symbolic_binning2(mint* __restrict__ d_row_flop,
-                        int M,
-                        mint* __restrict__ d_bins,
-                        mint* __restrict__ d_bin_size,
-                        mint* __restrict__ d_bin_offset) {
+__launch_bounds__(1024, 2) __global__
+    void k_symbolic_binning2(mint* __restrict__ d_row_flop,
+                             int M,
+                             mint* __restrict__ d_bins,
+                             mint* __restrict__ d_bin_size,
+                             mint* __restrict__ d_bin_offset) {
     __shared__ mint shared_bin_size[NUM_BIN];
     __shared__ mint shared_bin_offset[NUM_BIN];
     if (threadIdx.x < NUM_BIN) {
@@ -94,12 +94,12 @@ __global__ void k_binning_small(mint* d_bins, mint M) {
     d_bins[i] = i;
 }
 
-__global__ void __launch_bounds__(1024, 2)
-    k_numeric_binning(mint* __restrict__ d_row_nnz,
-                      int M,
-                      mint* __restrict__ d_bin_size,
-                      mint* __restrict__ d_total_nnz,
-                      mint* __restrict__ d_max_row_nnz) {
+__launch_bounds__(1024, 2) __global__
+    void k_numeric_binning(mint* __restrict__ d_row_nnz,
+                           int M,
+                           mint* __restrict__ d_bin_size,
+                           mint* __restrict__ d_total_nnz,
+                           mint* __restrict__ d_max_row_nnz) {
     __shared__ mint shared_bin_size[NUM_BIN];
     __shared__ mint shared_local_nnz[1];
     __shared__ mint shared_max_row_nnz[1];
@@ -143,12 +143,12 @@ before_end:
     }
 }
 
-__global__ void k_numeric_binning2 __launch_bounds__(1024,
-                                                     2)(mint* __restrict__ d_row_nnz,
-                                                        int M,
-                                                        mint* __restrict__ d_bins,
-                                                        mint* __restrict__ d_bin_size,
-                                                        mint* __restrict__ d_bin_offset) {
+__launch_bounds__(1024, 2) __global__
+    void k_numeric_binning2(mint* __restrict__ d_row_nnz,
+                            int M,
+                            mint* __restrict__ d_bins,
+                            mint* __restrict__ d_bin_size,
+                            mint* __restrict__ d_bin_offset) {
     __shared__ mint shared_bin_size[NUM_BIN];
     __shared__ mint shared_bin_offset[NUM_BIN];
     if (threadIdx.x < NUM_BIN) {
