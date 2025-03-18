@@ -201,14 +201,12 @@ auto main(int argc, char** argv) -> int {
     // Warm up the GPU
     utils::cudaruntime_warmup();
     constexpr int N_WARMUP = 5;
-    for (int i = 0; i < N_WARMUP; i++) {
-        fmt::println("Warmup iteration {}", i + 1);
+    for (int i = 0; i < N_WARMUP; i++)
         auto d_c = spgemm_cusparse(d_a, d_b);
-    }
 
-    // Measure SpGEMM
+    // Benchmark
     constexpr int N_ITERS = 10;
-    std::intmax_t total_time_ns = 0.0;
+    std::intmax_t total_time_ns = 0;
     for (int i = 0; i < N_ITERS; i++) {
         const auto start = clock::now();
         const auto d_c = spgemm_cusparse(d_a, d_b);
