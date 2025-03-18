@@ -4,7 +4,6 @@
 #include <utils/utils.cuh>
 
 #include "conversion.cuh"
-#include "cusparse_spgemm.h"
 #include "kernel_wrapper.cuh"
 #include "Timings.h"
 
