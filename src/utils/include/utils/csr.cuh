@@ -1,7 +1,6 @@
 #pragma once
 
 #include <concepts>
-#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -17,12 +16,6 @@ enum class Location : std::uint8_t {
     Device,
 };
 
-template<std::floating_point T>
-auto get_csr_byte_size(const std::int32_t nnz, const std::int32_t m) -> std::size_t {
-    return (gsl::narrow_cast<std::size_t>(m + 1) * sizeof(std::int32_t))
-           + (gsl::narrow_cast<std::size_t>(nnz) * (sizeof(std::int32_t) + sizeof(T)));
-}
-
 template<std::floating_point T, Location L>
 struct CSR {
     std::int32_t nnz{};
@@ -32,11 +25,12 @@ struct CSR {
     std::int32_t* cols{};
     T* values{};
 
+    CSR() = default;
     CSR(std::int32_t nnz_, std::int32_t m_, std::int32_t n_);
-    CSR(const CSR& /*other*/);
-    CSR(CSR&& /*other*/) noexcept;
-    auto operator=(const CSR& /*other*/) -> CSR&;
-    auto operator=(CSR&& /*other*/) noexcept -> CSR&;
+    CSR(const CSR& other);
+    CSR(CSR&& other) noexcept;
+    auto operator=(const CSR& other) -> CSR&;
+    auto operator=(CSR&& other) noexcept -> CSR&;
     ~CSR();
 
     static auto load_from_filename(const std::string& filename) -> CSR<T, L>
@@ -51,42 +45,44 @@ struct CSR {
     template<std::floating_point T_, Location L_>
     friend auto swap(CSR<T_, L_>&, CSR<T_, L_>) noexcept -> void;
 
-    auto free() -> void;
+    auto release() -> void;
+
+private:
+
+    static auto allocate(std::int32_t count, std::size_t size) -> void*;
+
+    static auto free(void* ptr) -> void;
+
+    static auto copy(void* dst,
+                     const void* src,
+                     std::int32_t count,
+                     std::size_t size,
+                     cudaMemcpyKind kind) -> void;
 };
 
 template<std::floating_point T, Location L>
 CSR<T, L>::CSR(const std::int32_t nnz_, const std::int32_t m_, const std::int32_t n_)
-    : nnz{nnz_}, m{m_}, n{n_} {
-    const auto bytes = get_csr_byte_size<T>(nnz_, m_);
-    void* ptr{};
-    if constexpr (L == Location::Host) {
-        handle_cuda_error(cudaMallocHost(&ptr, bytes));
-    } else {
-        handle_cuda_error(cudaMalloc(&ptr, bytes));
-    }
-    rows_ptr = static_cast<std::int32_t*>(ptr);
-    cols = rows_ptr + m_ + 1;
-    values = reinterpret_cast<T*>(cols + nnz_);
-}
+    : nnz{nnz_},
+      m{m_},
+      n{n_},
+      rows_ptr{static_cast<std::int32_t*>(allocate(m + 1, sizeof(std::int32_t)))},
+      cols{static_cast<std::int32_t*>(allocate(nnz, sizeof(std::int32_t)))},
+      values{static_cast<T*>(allocate(nnz, sizeof(T)))} {}
 
 template<std::floating_point T, Location L>
-CSR<T, L>::CSR(const CSR& other) : nnz{other.nnz}, m{other.m}, n{other.n} {
-    const auto bytes = get_csr_byte_size<T>(nnz, m);
-    void* ptr{};
-    if constexpr (L == Location::Host) {
-        handle_cuda_error(cudaMallocHost(&ptr, bytes));
-    } else {
-        handle_cuda_error(cudaMalloc(&ptr, bytes));
-    }
-    rows_ptr = static_cast<std::int32_t*>(ptr);
-    cols = rows_ptr + m + 1;
-    values = reinterpret_cast<T*>(cols + nnz);
-    if constexpr (L == Location::Host)
-        handle_cuda_error(
-            cudaMemcpy(rows_ptr, other.rows_ptr, bytes, cudaMemcpyHostToHost));
-    else
-        handle_cuda_error(
-            cudaMemcpy(rows_ptr, other.rows_ptr, bytes, cudaMemcpyDeviceToDevice));
+CSR<T, L>::CSR(const CSR& other)
+    : nnz{other.nnz},
+      m{other.m},
+      n{other.n},
+      rows_ptr{static_cast<std::int32_t*>(allocate(m + 1, sizeof(std::int32_t)))},
+      cols{static_cast<std::int32_t*>(allocate(nnz, sizeof(std::int32_t)))},
+      values{static_cast<T*>(allocate(nnz, sizeof(T)))} {
+    const auto direction = (L == Location::Host) ? cudaMemcpyHostToHost
+                                                 : cudaMemcpyDeviceToDevice;
+
+    copy(rows_ptr, other.rows_ptr, m + 1, sizeof(std::int32_t), direction);
+    copy(cols, other.cols, nnz, sizeof(std::int32_t), direction);
+    copy(values, other.values, nnz, sizeof(T), direction);
 }
 
 template<std::floating_point T, Location L>
@@ -111,18 +107,14 @@ template<std::floating_point T, Location L>
 auto CSR<T, L>::operator=(CSR&& other) noexcept -> CSR& {
     if (this == &other)
         return *this;
-    nnz = std::exchange(other.nnz, 0);
-    m = std::exchange(other.m, 0);
-    n = std::exchange(other.n, 0);
-    rows_ptr = std::exchange(other.rows_ptr, nullptr);
-    cols = std::exchange(other.cols, nullptr);
-    values = std::exchange(other.values, nullptr);
+    auto tmp{std::move(other)};
+    swap(*this, tmp);
     return *this;
 }
 
 template<std::floating_point T, Location L>
 CSR<T, L>::~CSR() {
-    free();
+    release();
 }
 
 template<std::floating_point T, Location L>
@@ -187,16 +179,17 @@ template<std::floating_point T, Location L>
 template<Location To>
 auto CSR<T, L>::to() const -> CSR<T, To> {
     static_assert(To != L, "Cannot convert to the same location");
-    CSR<T, To> csr(nnz, m, n);
-    const auto bytes = get_csr_byte_size<T>(nnz, m);
-    if constexpr (To == Location::Device) {
-        handle_cuda_error(
-            cudaMemcpy(csr.rows_ptr, rows_ptr, bytes, cudaMemcpyHostToDevice));
-    } else {
-        handle_cuda_error(
-            cudaMemcpy(csr.rows_ptr, rows_ptr, bytes, cudaMemcpyDeviceToHost));
-    }
-    return csr;
+
+    CSR<T, To> to(nnz, m, n);
+
+    const auto direction = (To == Location::Device) ? cudaMemcpyHostToDevice
+                                                    : cudaMemcpyDeviceToHost;
+
+    copy(to.rows_ptr, rows_ptr, m + 1, sizeof(std::int32_t), direction);
+    copy(to.cols, cols, nnz, sizeof(std::int32_t), direction);
+    copy(to.values, values, nnz, sizeof(T), direction);
+
+    return to;
 }
 
 template<std::floating_point T, Location L>
@@ -211,18 +204,45 @@ auto swap(CSR<T, L>& lhs, CSR<T, L>& rhs) noexcept -> void {
 }
 
 template<std::floating_point T, Location L>
-auto CSR<T, L>::free() -> void {
-    if constexpr (L == Location::Host) {
-        handle_cuda_error(cudaFreeHost(rows_ptr));
-    } else {
-        handle_cuda_error(cudaFree(rows_ptr));
-    }
+auto CSR<T, L>::release() -> void {
+    free(rows_ptr);
+    free(cols);
+    free(values);
     nnz = 0;
     m = 0;
     n = 0;
     rows_ptr = nullptr;
     cols = nullptr;
     values = nullptr;
+}
+
+template<std::floating_point T, Location L>
+auto CSR<T, L>::allocate(std::int32_t count, std::size_t size) -> void* {
+    void* ptr{};
+    if constexpr (L == Location::Host) {
+        handle_cuda_error(cudaMallocHost(&ptr, count * size));
+    } else {
+        handle_cuda_error(cudaMalloc(&ptr, count * size));
+    }
+    return ptr;
+}
+
+template<std::floating_point T, Location L>
+auto CSR<T, L>::free(void* ptr) -> void {
+    if constexpr (L == Location::Host) {
+        handle_cuda_error(cudaFreeHost(ptr));
+    } else {
+        handle_cuda_error(cudaFree(ptr));
+    }
+}
+
+template<std::floating_point T, Location L>
+auto CSR<T, L>::copy(void* dst,
+                     const void* src,
+                     std::int32_t count,
+                     std::size_t size,
+                     cudaMemcpyKind kind) -> void {
+    handle_cuda_error(cudaMemcpy(dst, src, count * size, kind));
 }
 
 } // namespace utils
