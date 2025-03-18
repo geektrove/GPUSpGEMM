@@ -2,8 +2,8 @@
 
 #include <fmt/core.h>
 
-#define CHECK_CUDA(value) check_cuda_error((value), #value, __FILE__, __LINE__)
-#define CHECK_LAST_CUDA() check_last_cuda_error(__FILE__, __LINE__)
+#define CHECK_CUDA(value) utils::check_cuda_error((value), #value, __FILE__, __LINE__)
+#define CHECK_LAST_CUDA() utils::check_last_cuda_error(__FILE__, __LINE__)
 
 namespace utils {
 
