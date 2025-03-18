@@ -90,8 +90,8 @@
       "name": "dev-gcc-warnings",
       "hidden": true,
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wshadow -Wuseless-cast",
-        "CMAKE_CUDA_FLAGS": "--Wreorder --Wdefault-stream-launch --Wmissing-launch-bounds --Wext-lambda-captures-this -Xptxas --warn-on-local-memory-usage,--warn-on-spills -Xcompiler -Wall,-Wextra,-Wnon-virtual-dtor,-Wunused,-Wconversion,-Wshadow,-Wuseless-cast "
+        "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wconversion -Wshadow",
+        "CMAKE_CUDA_FLAGS": "--Wreorder --Wdefault-stream-launch --Wmissing-launch-bounds --Wext-lambda-captures-this -Xptxas --warn-on-local-memory-usage,--warn-on-spills -Xcompiler -Wall,-Wextra,-Wnon-virtual-dtor,-Wunused,-Wconversion,-Wshadow"
       }
     },
     {
