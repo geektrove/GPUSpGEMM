@@ -187,7 +187,7 @@ auto main(int argc, char** argv) -> int {
     auto d_a = h_a.to<utils::Location::Device>();
     auto d_b = h_b.to<utils::Location::Device>();
 
-    const auto nip = get_nip(d_a, d_b);
+    const auto nip = utils::get_nip(d_a, d_b);
     fmt::print("Number of intermediate products: {}\n", nip);
 
     auto d_c = spgemm_cusparse(d_a, d_b);
