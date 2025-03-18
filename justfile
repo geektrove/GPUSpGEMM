@@ -1,6 +1,6 @@
 #!/usr/bin/env just --justfile
 
-preset := "dev-gcc-release"
+preset := "dev-clang-release"
 
 default:
     just --list
