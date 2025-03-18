@@ -18,10 +18,6 @@ namespace {
 
 template<std::floating_point T>
 auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<T> {
-    // Initialize cuSPARSE
-    cusparseHandle_t handle{};
-    utils::handle_cusparse_error(cusparseCreate(&handle));
-
     // Create cuSPARSE matrix descriptors
     cusparseSpMatDescr_t desc_a{};
     utils::handle_cusparse_error(cusparseCreateCsr(&desc_a,
@@ -60,13 +56,17 @@ auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<
                                                    CUSPARSE_INDEX_BASE_ZERO,
                                                    CUDA_R_64F));
 
-    // Initialize cuSPARSE SpGEMM descriptor
-    cusparseSpGEMMDescr_t spgemm_desc{};
-    utils::handle_cusparse_error(cusparseSpGEMM_createDescr(&spgemm_desc));
-
     // Set parameters for the algorithm
     const double alpha = 1.0;
     const double beta = 0.0;
+
+    // Initialize cuSPARSE
+    cusparseHandle_t handle{};
+    utils::handle_cusparse_error(cusparseCreate(&handle));
+
+    // Initialize cuSPARSE SpGEMM descriptor
+    cusparseSpGEMMDescr_t spgemm_desc{};
+    utils::handle_cusparse_error(cusparseSpGEMM_createDescr(&spgemm_desc));
 
     // First stage
     size_t buffer1_size{};
@@ -162,10 +162,10 @@ auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<
     utils::handle_cuda_error(cudaFree(buffer2));
     utils::handle_cuda_error(cudaFree(buffer1));
     utils::handle_cusparse_error(cusparseSpGEMM_destroyDescr(spgemm_desc));
+    utils::handle_cusparse_error(cusparseDestroy(handle));
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_c));
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_b));
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_a));
-    utils::handle_cusparse_error(cusparseDestroy(handle));
 
     return d_c;
 }
