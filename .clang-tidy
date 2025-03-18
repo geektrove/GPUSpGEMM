@@ -9,17 +9,20 @@ Checks: >
   performance-*,
   portability-*,
   readability-*,
+  -bugprone-exception-escape,
+  -bugprone-easily-swappable-parameters,
   -cppcoreguidelines-pro-bounds-*,
   -cppcoreguidelines-avoid-c-arrays,
   -cppcoreguidelines-avoid-non-const-global-variables,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -cppcoreguidelines-pro-type-reinterpret-cast,
   -cppcoreguidelines-owning-memory,
+  -misc-non-private-member-variables-in-classes,
+  -modernize-avoid-c-arrays,
   -readability-braces-around-statements,
   -readability-identifier-length,
   -readability-static-accessed-through-instance,
   -readability-redundant-declaration,
-  -modernize-avoid-c-arrays,
 WarningsAsErrors: ""
 HeaderFileExtensions:
   - ""
