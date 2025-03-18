@@ -1,10 +1,9 @@
-#include <fstream>
-
 #include <cub/cub.cuh>
 #include <cuda_profiler_api.h>
 
-#include <utils/csr.cuh>
+#include <utils/utils.cuh>
 
+#include "conversion.cuh"
 #include "cusparse_spgemm.h"
 #include "kernel_wrapper.cuh"
 #include "Timings.h"
@@ -68,30 +67,12 @@ void opsparse(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
-        fmt::println("Usage: {} <input> <output>", argv[0]);
+    if (argc != 4) {
+        fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
         return EXIT_FAILURE;
     }
-    const auto* input = argv[1];
-    const auto* output = argv[2];
-
-    auto h_a = utils::CSR<double, utils::Location::Host>::load_from_filename(input);
-
-    CSR A;
-    A.M = h_a.m;
-    A.N = h_a.n;
-    A.nnz = h_a.nnz;
-    A.rpt = new mint[A.M + 1];
-    A.col = new mint[A.nnz];
-    A.val = new mdouble[A.nnz];
-    std::copy(h_a.rows_ptr, h_a.rows_ptr + A.M + 1, A.rpt);
-    std::copy(h_a.cols, h_a.cols + A.nnz, A.col);
-    std::copy(h_a.values, h_a.values + A.nnz, A.val);
-    A.d_rpt = nullptr;
-    A.d_col = nullptr;
-    A.d_val = nullptr;
-
-    CSR B = A;
+    CSR A = convertFromUtilsCSR(HostCSR::load_from_filename(argv[1]));
+    CSR B = convertFromUtilsCSR(HostCSR::load_from_filename(argv[2]));
 
     A.H2D();
     B.H2D();
@@ -105,6 +86,7 @@ int main(int argc, char** argv) {
         opsparse(A, B, C, meta, timing);
         C.release();
     }
+
     mint iter = 10;
     Timings timing, bench_timing;
     for (mint i = 0; i < iter; i++) {
@@ -116,21 +98,12 @@ int main(int argc, char** argv) {
     }
     bench_timing /= iter;
 
-    // printf("%s ", mat1.c_str());
     bench_timing.print(total_flop * 2);
 
-    // compare result
-
-    //C.D2H();
-    //CSR C_ref;
-    //cusparse_spgemm(&A, &B, &C_ref);
-    //C_ref.D2H();
-    //if(C == C_ref){
-    //    printf("pass\n");
-    //}
-    //else{
-    //    printf("error\n");
-    //}
+    // save the result
+    C.D2H();
+    const auto c_h = convertToUtilsCSR(C);
+    c_h.save_to_filename(argv[3]);
 
     A.release();
     B.release();

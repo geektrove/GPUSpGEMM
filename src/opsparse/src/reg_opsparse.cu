@@ -1,9 +1,12 @@
+#include <cub/cub.cuh>
+#include <cuda_profiler_api.h>
+
+#include <utils/utils.cuh>
+
+#include "conversion.cuh"
 #include "cusparse_spgemm.h"
 #include "kernel_wrapper.cuh"
 #include "Timings.h"
-#include <cub/cub.cuh>
-#include <cuda_profiler_api.h>
-#include <fstream>
 
 void opsparse(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
     double t0, t1;
@@ -90,50 +93,14 @@ void opsparse(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
 }
 
 int main(int argc, char** argv) {
-    std::string mat1, mat2;
-    mat1 = "can_24";
-    mat2 = "can_24";
-    if (argc == 2) {
-        mat1 = argv[1];
-        mat2 = argv[1];
-    }
-    if (argc >= 3) {
-        mat1 = argv[1];
-        mat2 = argv[2];
-    }
-    std::string mat1_file;
-    if (mat1.find("ER") != std::string::npos) {
-        mat1_file = "../matrix/ER/" + mat1 + ".mtx";
-    } else if (mat1.find("G500") != std::string::npos) {
-        mat1_file = "../matrix/G500/" + mat1 + ".mtx";
-    } else {
-        mat1_file = "../matrix/suite_sparse/" + mat1 + "/" + mat1 + ".mtx";
-    }
-    std::string mat2_file;
-    if (mat2.find("ER") != std::string::npos) {
-        mat2_file = "../matrix/ER/" + mat2 + ".mtx";
-    } else if (mat2.find("G500") != std::string::npos) {
-        mat2_file = "../matrix/G500/" + mat2 + ".mtx";
-    } else {
-        mat2_file = "../matrix/suite_sparse/" + mat2 + "/" + mat2 + ".mtx";
-    }
+    using HostCSR = utils::CSR<double, utils::Location::Host>;
 
-    CSR A, B;
-    A.construct(mat1_file);
-    if (mat1 == mat2) {
-        B = A;
-    } else {
-        B.construct(mat2_file);
-        if (A.N == B.M) {
-            // do nothing
-        } else if (A.N < B.M) {
-            CSR tmp(B, A.N, B.N, 0, 0);
-            B = tmp;
-        } else {
-            CSR tmp(A, A.M, B.M, 0, 0);
-            A = tmp;
-        }
+    if (argc != 4) {
+        fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
+        return EXIT_FAILURE;
     }
+    CSR A = convertFromUtilsCSR(HostCSR::load_from_filename(argv[1]));
+    CSR B = convertFromUtilsCSR(HostCSR::load_from_filename(argv[2]));
 
     A.H2D();
     B.H2D();
@@ -159,25 +126,16 @@ int main(int argc, char** argv) {
     }
     bench_timing /= iter;
 
-    printf("%s ", mat1.c_str());
     bench_timing.reg_print(total_flop * 2);
 
-    // compare result
-
-    //C.D2H();
-    //CSR C_ref;
-    //cusparse_spgemm(&A, &B, &C_ref);
-    //C_ref.D2H();
-    //if(C == C_ref){
-    //    printf("pass\n");
-    //}
-    //else{
-    //    printf("error\n");
-    //}
+    // save the result
+    C.D2H();
+    const auto c_h = convertToUtilsCSR(C);
+    c_h.save_to_filename(argv[3]);
 
     A.release();
     B.release();
-
     C.release();
+
     return 0;
 }
