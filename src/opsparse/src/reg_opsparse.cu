@@ -92,8 +92,6 @@ void opsparse(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
 }
 
 int main(int argc, char** argv) {
-    using HostCSR = utils::CSR<double, utils::Location::Host>;
-
     if (argc != 4) {
         fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
         return EXIT_FAILURE;
