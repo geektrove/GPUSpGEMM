@@ -53,7 +53,7 @@ set_target_properties(
 if(${CMAKE_CUDA_COMPILER_ID} STREQUAL "NVIDIA")
     target_compile_options(
         reg_opsparse PRIVATE --extra-device-vectorization --use_fast_math
-                         --restrict --expt-relaxed-constexpr)
+                             --restrict --expt-relaxed-constexpr)
 endif()
 
 target_link_libraries(reg_opsparse PRIVATE libopsparse)

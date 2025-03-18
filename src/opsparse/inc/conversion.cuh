@@ -1,11 +1,11 @@
 #pragma once
 
-#include <utils/utils.cuh>
 #include <CSR.h>
+#include <utils/utils.cuh>
 
 using HostCSR = utils::CSR<double, utils::Location::Host>;
 
-inline auto convertFromUtilsCSR(const HostCSR &from) -> CSR {
+inline auto convertFromUtilsCSR(const HostCSR& from) -> CSR {
     CSR to;
     to.M = from.m;
     to.N = from.n;
