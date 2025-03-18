@@ -91,11 +91,10 @@ void opsparse(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
     timing.total = fast_clock_time() - t1;
 }
 
-int main(int argc, char** argv) {
+auto main(int argc, char** argv) -> int {
     using clock = std::chrono::high_resolution_clock;
-    using std::chrono::duration;
-    using std::chrono::milliseconds;
-    using DurationMS = duration<double, milliseconds::period>;
+    constexpr auto NANO = 1'000'000'000.0;
+    constexpr auto GIGA = 1'000'000'000.0;
 
     // Load the matrices
     if (argc != 4) {
@@ -114,7 +113,8 @@ int main(int argc, char** argv) {
     // Compute NIP
     const auto nip = utils::get_nip(d_a, d_b);
     fmt::println("NIP: {}", nip);
-    fmt::println("FLOP: {}", 2 * nip);
+    const auto flop = 2 * nip;
+    fmt::println("FLOP: {}", flop);
 
     // Convert to OpSparse CSR format
     CSR A = convertFromUtilsCSR(h_a);
@@ -122,15 +122,12 @@ int main(int argc, char** argv) {
     A.H2D();
     B.H2D();
 
-    // Compute FLOP by OpSparse
-    long total_flop = compute_flop(A, B);
-    fmt::println("Total FLOP (OpSparse): {}", total_flop);
-
     // Warm up the GPU
     CSR C;
     Meta meta;
-    {
-        utils::cudaruntime_warmup();
+    utils::cudaruntime_warmup();
+    constexpr int N_WARMUP = 5;
+    for (int i = 0; i < N_WARMUP; i++) {
         Timings timing;
         opsparse(A, B, C, meta, timing);
         C.release();
@@ -138,27 +135,33 @@ int main(int argc, char** argv) {
 
     // Benchmark
     constexpr int N_ITERS = 10;
-    double total_time = 0.0;
+    std::intmax_t total_time_ns = 0;
     Timings timing;
     for (int i = 0; i < N_ITERS; i++) {
         const auto start = clock::now();
         opsparse(A, B, C, meta, timing);
         const auto end = clock::now();
+
         if (i < N_ITERS - 1)
             C.release();
-        const auto elapsed = DurationMS(end - start).count();
-        total_time += elapsed;
-        fmt::println("Iteration {}: elapsed time = {:.3f} ms", i + 1, elapsed);
+
+        const auto elapsed = end - start;
+        const auto elapsed_ns = std::chrono::nanoseconds(elapsed).count();
+        total_time_ns += elapsed_ns;
     }
-    fmt::println("Average time over {} iterations: {:.3f} ms",
-                 N_ITERS,
-                 total_time / N_ITERS);
+    const auto average_time_ns = gsl::narrow_cast<double>(total_time_ns) / N_ITERS;
+    const auto average_time_s = average_time_ns / NANO;
+
+    fmt::println("Average time over {} iterations: {} ns", N_ITERS, average_time_ns);
+    fmt::println("Average performance: {:.6f} GFLOPS",
+                 gsl::narrow_cast<double>(flop) / (GIGA * average_time_s));
 
     // save the result
     C.D2H();
     const auto c_h = convertToUtilsCSR(C);
     c_h.save_to_filename(argv[3]);
 
+    // Free the matrices
     A.release();
     B.release();
     C.release();
