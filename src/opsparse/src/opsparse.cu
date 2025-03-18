@@ -66,26 +66,46 @@ void opsparse(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
 }
 
 int main(int argc, char** argv) {
+    // Load the matrices
     if (argc != 4) {
         fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
         return EXIT_FAILURE;
     }
-    CSR A = convertFromUtilsCSR(HostCSR::load_from_filename(argv[1]));
-    CSR B = convertFromUtilsCSR(HostCSR::load_from_filename(argv[2]));
+    const auto h_a = HostCSR::load_from_filename(argv[1]);
+    const auto h_b = HostCSR::load_from_filename(argv[2]);
+    if (h_a.n != h_b.m) {
+        fmt::println("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
+        return EXIT_FAILURE;
+    }
+    const auto d_a = h_a.to<utils::Location::Device>();
+    const auto d_b = h_b.to<utils::Location::Device>();
 
+    // Compute NIP
+    const auto nip = utils::get_nip(d_a, d_b);
+    fmt::println("NIP: {}", nip);
+    fmt::println("FLOP: {}", 2 * nip);
+
+    // Convert to OpSparse CSR format
+    CSR A = convertFromUtilsCSR(h_a);
+    CSR B = convertFromUtilsCSR(h_b);
     A.H2D();
     B.H2D();
 
+    // Compute FLOP by OpSparse
     long total_flop = compute_flop(A, B);
+    fmt::println("Total FLOP (OpSparse): {}", total_flop);
+
+    // Warm up the GPU
     CSR C;
-    cudaruntime_warmup();
     Meta meta;
     {
+        utils::cudaruntime_warmup();
         Timings timing;
         opsparse(A, B, C, meta, timing);
         C.release();
     }
 
+    // Benchmark
     mint iter = 10;
     Timings timing, bench_timing;
     for (mint i = 0; i < iter; i++) {
@@ -96,7 +116,6 @@ int main(int argc, char** argv) {
         }
     }
     bench_timing /= iter;
-
     bench_timing.print(total_flop * 2);
 
     // save the result

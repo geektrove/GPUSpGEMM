@@ -92,38 +92,67 @@ void opsparse(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
 }
 
 int main(int argc, char** argv) {
+    using clock = std::chrono::high_resolution_clock;
+    using std::chrono::duration;
+    using std::chrono::milliseconds;
+    using DurationMS = duration<double, milliseconds::period>;
+
+    // Load the matrices
     if (argc != 4) {
         fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
         return EXIT_FAILURE;
     }
-    CSR A = convertFromUtilsCSR(HostCSR::load_from_filename(argv[1]));
-    CSR B = convertFromUtilsCSR(HostCSR::load_from_filename(argv[2]));
+    const auto h_a = HostCSR::load_from_filename(argv[1]);
+    const auto h_b = HostCSR::load_from_filename(argv[2]);
+    if (h_a.n != h_b.m) {
+        fmt::println("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
+        return EXIT_FAILURE;
+    }
+    const auto d_a = h_a.to<utils::Location::Device>();
+    const auto d_b = h_b.to<utils::Location::Device>();
 
+    // Compute NIP
+    const auto nip = utils::get_nip(d_a, d_b);
+    fmt::println("NIP: {}", nip);
+    fmt::println("FLOP: {}", 2 * nip);
+
+    // Convert to OpSparse CSR format
+    CSR A = convertFromUtilsCSR(h_a);
+    CSR B = convertFromUtilsCSR(h_b);
     A.H2D();
     B.H2D();
 
+    // Compute FLOP by OpSparse
     long total_flop = compute_flop(A, B);
+    fmt::println("Total FLOP (OpSparse): {}", total_flop);
+
+    // Warm up the GPU
     CSR C;
-    cudaruntime_warmup();
     Meta meta;
     {
+        utils::cudaruntime_warmup();
         Timings timing;
         opsparse(A, B, C, meta, timing);
         C.release();
     }
 
-    mint iter = 10;
-    Timings timing, bench_timing;
-    for (mint i = 0; i < iter; i++) {
+    // Benchmark
+    constexpr int N_ITERS = 10;
+    double total_time = 0.0;
+    Timings timing;
+    for (int i = 0; i < N_ITERS; i++) {
+        const auto start = clock::now();
         opsparse(A, B, C, meta, timing);
-        bench_timing += timing;
-        if (i < iter - 1) {
+        const auto end = clock::now();
+        if (i < N_ITERS - 1)
             C.release();
-        }
+        const auto elapsed = DurationMS(end - start).count();
+        total_time += elapsed;
+        fmt::println("Iteration {}: elapsed time = {:.3f} ms", i + 1, elapsed);
     }
-    bench_timing /= iter;
-
-    bench_timing.reg_print(total_flop * 2);
+    fmt::println("Average time over {} iterations: {:.3f} ms",
+                 N_ITERS,
+                 total_time / N_ITERS);
 
     // save the result
     C.D2H();
