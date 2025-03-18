@@ -65,10 +65,10 @@ inline long get_tsc_freq(){
 inline double fast_clock_time(){
     using std::chrono::high_resolution_clock;
     using std::chrono::duration_cast;
-    using std::chrono::seconds;
+    using std::chrono::duration;
 
     auto now = high_resolution_clock::now();
-    return duration_cast<std::chrono::duration<double>>(now.time_since_epoch()).count();
+    return duration_cast<duration<double>>(now.time_since_epoch()).count();
 
     // long counter;
     // HP_TIMING_NOW(counter);
