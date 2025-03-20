@@ -1,6 +1,6 @@
 #!/usr/bin/env just --justfile
 
-preset := "dev-clang-release"
+preset := "dev-clang"
 
 default:
     just --list
