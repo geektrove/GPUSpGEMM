@@ -1,19 +1,13 @@
-#include <chrono>
 #include <concepts>
 #include <cstdlib>
 
-#include <cuda_runtime_api.h>
 #include <cusparse.h>
-#include <fmt/base.h>
-#include <fmt/core.h>
 #include <gsl/gsl-lite.hpp>
 
 #include <utils/utils.cuh>
 
-namespace {
-
 template<std::floating_point T>
-auto spgemm_cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
+auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
     -> utils::DeviceCSR<T> {
     // Create cuSPARSE matrix descriptors
     cusparseSpMatDescr_t desc_a{};
@@ -130,9 +124,9 @@ auto spgemm_cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                                         buffer2));
 
     // Extract the result matrix size
-    int64_t m_c{};
-    int64_t n_c{};
-    int64_t nnz_c{};
+    std::int64_t m_c{};
+    std::int64_t n_c{};
+    std::int64_t nnz_c{};
     utils::handle_cusparse_error(cusparseSpMatGetSize(desc_c, &m_c, &n_c, &nnz_c));
 
     // Allocate the result matrix
@@ -165,64 +159,4 @@ auto spgemm_cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_a));
 
     return d_c;
-}
-
-} // namespace
-
-auto main(int argc, char** argv) -> int {
-    using clock = std::chrono::high_resolution_clock;
-    constexpr auto NANO = 1'000'000'000.0;
-    constexpr auto GIGA = 1'000'000'000.0;
-
-    // Load the matrices
-    if (argc != 4) {
-        fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
-        return EXIT_FAILURE;
-    }
-    const auto h_a = utils::HostCSR<double>::load_from_filename(argv[1]);
-    const auto h_b = utils::HostCSR<double>::load_from_filename(argv[2]);
-    if (h_a.n != h_b.m) {
-        fmt::println("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
-        return EXIT_FAILURE;
-    }
-    const auto d_a = h_a.to<utils::Location::Device>();
-    const auto d_b = h_b.to<utils::Location::Device>();
-
-    // Compute NIP
-    const auto nip = utils::get_nip(d_a, d_b);
-    fmt::println("NIP: {}", nip);
-    const auto flop = 2 * nip;
-    fmt::println("FLOP: {}", flop);
-
-    // Warm up the GPU
-    utils::cudaruntime_warmup();
-    constexpr int N_WARMUP = 5;
-    for (int i = 0; i < N_WARMUP; i++)
-        auto d_c = spgemm_cusparse(d_a, d_b);
-
-    // Benchmark
-    constexpr int N_ITERS = 10;
-    std::intmax_t total_time_ns = 0;
-    for (int i = 0; i < N_ITERS; i++) {
-        const auto start = clock::now();
-        const auto d_c = spgemm_cusparse(d_a, d_b);
-        const auto end = clock::now();
-
-        const auto elapsed = end - start;
-        const auto elapsed_ns = std::chrono::nanoseconds(elapsed).count();
-        total_time_ns += elapsed_ns;
-    }
-    const auto average_time_ns = gsl::narrow_cast<double>(total_time_ns) / N_ITERS;
-    const auto average_time_s = average_time_ns / NANO;
-
-    fmt::println("Average time over {} iterations: {} ns", N_ITERS, average_time_ns);
-    fmt::println("Average performance: {:.6f} GFLOPS",
-                 gsl::narrow_cast<double>(flop) / (GIGA * average_time_s));
-
-    // Save the result
-    auto d_c = spgemm_cusparse(d_a, d_b);
-    auto h_c = d_c.to<utils::Location::Host>();
-    h_c.save_to_filename(argv[3]);
-
-    return EXIT_SUCCESS;
 }

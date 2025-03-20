@@ -1,0 +1,45 @@
+#include <cstdlib>
+
+#include <cusparse.h>
+#include <fmt/base.h>
+#include <gsl/gsl-lite.hpp>
+
+#include <cusparse/cusparse.cuh>
+#include <utils/utils.cuh>
+
+auto main(int argc, char** argv) -> int {
+    // Load the matrices
+    if (argc != 4) {
+        fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
+        return EXIT_FAILURE;
+    }
+    const auto h_a = utils::HostCSR<double>::load_from_filename(argv[1]);
+    const auto h_b = utils::HostCSR<double>::load_from_filename(argv[2]);
+    if (h_a.n != h_b.m) {
+        fmt::println("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
+        return EXIT_FAILURE;
+    }
+    const auto d_a = h_a.to<utils::Location::Device>();
+    const auto d_b = h_b.to<utils::Location::Device>();
+
+    // Compute NIP
+    const auto nip = utils::get_nip(d_a, d_b);
+    fmt::println("NIP: {}", nip);
+    const auto flop = 2 * nip;
+    fmt::println("FLOP: {}", flop);
+
+    // Warm up the GPU
+    {
+        utils::cudaruntime_warmup();
+        auto d_c = cusparse(d_a, d_b);
+    }
+
+    // Execute
+    const auto d_c = cusparse(d_a, d_b);
+
+    // Save the result
+    auto h_c = d_c.to<utils::Location::Host>();
+    h_c.save_to_filename(argv[3]);
+
+    return EXIT_SUCCESS;
+}
