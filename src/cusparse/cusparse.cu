@@ -10,15 +10,11 @@
 
 #include <utils/utils.cuh>
 
-template<std::floating_point T>
-using HostCSR = utils::CSR<T, utils::Location::Host>;
-template<std::floating_point T>
-using DeviceCSR = utils::CSR<T, utils::Location::Device>;
-
 namespace {
 
 template<std::floating_point T>
-auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<T> {
+auto spgemm_cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
+    -> utils::DeviceCSR<T> {
     // Create cuSPARSE matrix descriptors
     cusparseSpMatDescr_t desc_a{};
     utils::handle_cusparse_error(cusparseCreateCsr(&desc_a,
@@ -140,9 +136,9 @@ auto spgemm_cusparse(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> DeviceCSR<
     utils::handle_cusparse_error(cusparseSpMatGetSize(desc_c, &m_c, &n_c, &nnz_c));
 
     // Allocate the result matrix
-    DeviceCSR<T> d_c(gsl::narrow_cast<std::int32_t>(nnz_c),
-                     gsl::narrow_cast<std::int32_t>(m_c),
-                     gsl::narrow_cast<std::int32_t>(n_c));
+    utils::DeviceCSR<T> d_c(gsl::narrow_cast<std::int32_t>(nnz_c),
+                            gsl::narrow_cast<std::int32_t>(m_c),
+                            gsl::narrow_cast<std::int32_t>(n_c));
 
     // Extract the result matrix
     utils::handle_cusparse_error(
@@ -183,8 +179,8 @@ auto main(int argc, char** argv) -> int {
         fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
         return EXIT_FAILURE;
     }
-    const auto h_a = HostCSR<double>::load_from_filename(argv[1]);
-    const auto h_b = HostCSR<double>::load_from_filename(argv[2]);
+    const auto h_a = utils::HostCSR<double>::load_from_filename(argv[1]);
+    const auto h_b = utils::HostCSR<double>::load_from_filename(argv[2]);
     if (h_a.n != h_b.m) {
         fmt::println("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
         return EXIT_FAILURE;

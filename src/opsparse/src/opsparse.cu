@@ -101,8 +101,8 @@ auto main(int argc, char** argv) -> int {
         fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
         return EXIT_FAILURE;
     }
-    const auto h_a = HostCSR::load_from_filename(argv[1]);
-    const auto h_b = HostCSR::load_from_filename(argv[2]);
+    const auto h_a = utils::HostCSR<mdouble>::load_from_filename(argv[1]);
+    const auto h_b = utils::HostCSR<mdouble>::load_from_filename(argv[2]);
     if (h_a.n != h_b.m) {
         fmt::println("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
         return EXIT_FAILURE;

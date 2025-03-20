@@ -3,9 +3,7 @@
 #include <CSR.h>
 #include <utils/utils.cuh>
 
-using HostCSR = utils::CSR<double, utils::Location::Host>;
-
-inline auto convertFromUtilsCSR(const HostCSR& from) -> CSR {
+inline auto convertFromUtilsCSR(const utils::HostCSR<mdouble>& from) -> CSR {
     CSR to;
     to.M = from.m;
     to.N = from.n;
@@ -22,8 +20,8 @@ inline auto convertFromUtilsCSR(const HostCSR& from) -> CSR {
     return to;
 }
 
-inline auto convertToUtilsCSR(const CSR& from) -> HostCSR {
-    HostCSR to(from.nnz, from.M, from.N);
+inline auto convertToUtilsCSR(const CSR& from) -> utils::HostCSR<mdouble> {
+    utils::HostCSR<mdouble> to(from.nnz, from.M, from.N);
     std::copy_n(from.rpt, from.M + 1, to.rows_ptr);
     std::copy_n(from.col, from.nnz, to.cols);
     std::copy_n(from.val, from.nnz, to.values);

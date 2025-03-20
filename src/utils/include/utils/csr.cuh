@@ -245,4 +245,9 @@ auto CSR<T, L>::copy(void* dst,
     handle_cuda_error(cudaMemcpy(dst, src, count * size, kind));
 }
 
+template<std::floating_point T>
+using HostCSR = utils::CSR<T, utils::Location::Host>;
+template<std::floating_point T>
+using DeviceCSR = utils::CSR<T, utils::Location::Device>;
+
 } // namespace utils
