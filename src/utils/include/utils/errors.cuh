@@ -3,7 +3,7 @@
 #include <source_location>
 
 #include <cusparse.h>
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 namespace utils {
 
