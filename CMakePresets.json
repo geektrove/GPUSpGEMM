@@ -40,14 +40,14 @@
       }
     },
     {
-      "name": "gcc-debug",
-      "displayName": "GCC Debug",
+      "name": "gcc-relwithdebinfo",
+      "displayName": "GCC Release with Debug Info",
       "inherits": [
         "base",
         "gcc"
       ],
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     },
     {
@@ -62,14 +62,14 @@
       }
     },
     {
-      "name": "clang-debug",
-      "displayName": "Clang Debug",
+      "name": "clang-relwithdebinfo",
+      "displayName": "Clang Release with Debug Info",
       "inherits": [
         "base",
         "clang"
       ],
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     },
     {
@@ -107,47 +107,30 @@
       }
     },
     {
-      "name": "dev-gcc-release",
-      "displayName": "Dev GCC Release",
+      "name": "dev-gcc",
+      "displayName": "Dev GCC",
       "inherits": [
-        "gcc-release",
+        "gcc-relwithdebinfo",
         "dev-base",
         "dev-gcc-warnings"
       ]
     },
     {
-      "name": "dev-gcc-debug",
-      "displayName": "Dev GCC Debug",
+      "name": "dev-clang",
+      "displayName": "Dev Clang",
       "inherits": [
-        "gcc-debug",
-        "dev-base",
-        "dev-gcc-warnings"
-      ]
-    },
-    {
-      "name": "dev-clang-release",
-      "displayName": "Dev Clang Release",
-      "inherits": [
-        "clang-release",
+        "clang-relwithdebinfo",
         "dev-base",
         "dev-clang-warnings"
       ]
     },
     {
-      "name": "dev-clang-debug",
-      "displayName": "Dev Clang Debug",
+      "name": "dev-clang-sanitized",
+      "displayName": "Dev Clang Sanitized",
       "inherits": [
-        "clang-debug",
+        "clang-relwithdebinfo",
         "dev-base",
-        "dev-clang-warnings"
-      ]
-    },
-    {
-      "name": "dev-clang-release-sanitized",
-      "displayName": "Dev Clang Release Sanitized",
-      "inherits": [
-        "clang-release",
-        "dev-base",
+        "dev-clang-warnings",
         "dev-clang-sanitizers"
       ]
     }
@@ -159,9 +142,9 @@
       "configurePreset": "gcc-release"
     },
     {
-      "name": "gcc-debug",
-      "displayName": "GCC Debug",
-      "configurePreset": "gcc-debug"
+      "name": "gcc-relwithdebinfo",
+      "displayName": "GCC Release with Debug Info",
+      "configurePreset": "gcc-relwithdebinfo"
     },
     {
       "name": "clang-release",
@@ -169,34 +152,24 @@
       "configurePreset": "clang-release"
     },
     {
-      "name": "clang-debug",
-      "displayName": "Clang Debug",
-      "configurePreset": "clang-debug"
+      "name": "clang-relwithdebinfo",
+      "displayName": "Clang Release with Debug Info",
+      "configurePreset": "clang-relwithdebinfo"
     },
     {
-      "name": "dev-gcc-release",
-      "displayName": "Dev GCC Release",
-      "configurePreset": "dev-gcc-release"
+      "name": "dev-gcc",
+      "displayName": "Dev GCC",
+      "configurePreset": "dev-gcc"
     },
     {
-      "name": "dev-gcc-debug",
-      "displayName": "Dev GCC Debug",
-      "configurePreset": "dev-gcc-debug"
+      "name": "dev-clang",
+      "displayName": "Dev Clang",
+      "configurePreset": "dev-clang"
     },
     {
-      "name": "dev-clang-release",
-      "displayName": "Dev Clang Release",
-      "configurePreset": "dev-clang-release"
-    },
-    {
-      "name": "dev-clang-debug",
-      "displayName": "Dev Clang Debug",
-      "configurePreset": "dev-clang-debug"
-    },
-    {
-      "name": "dev-clang-release-sanitized",
-      "displayName": "Dev Clang Release Sanitized",
-      "configurePreset": "dev-clang-release-sanitized"
+      "name": "dev-clang-sanitized",
+      "displayName": "Dev Clang Sanitized",
+      "configurePreset": "dev-clang-sanitized"
     }
   ],
   "workflowPresets": [
@@ -215,16 +188,16 @@
       ]
     },
     {
-      "name": "gcc-debug",
-      "displayName": "GCC Debug",
+      "name": "gcc-relwithdebinfo",
+      "displayName": "GCC Release with Debug Info",
       "steps": [
         {
           "type": "configure",
-          "name": "gcc-debug"
+          "name": "gcc-relwithdebinfo"
         },
         {
           "type": "build",
-          "name": "gcc-debug"
+          "name": "gcc-relwithdebinfo"
         }
       ]
     },
@@ -243,86 +216,58 @@
       ]
     },
     {
-      "name": "clang-debug",
-      "displayName": "Clang Debug",
+      "name": "clang-relwithdebinfo",
+      "displayName": "Clang Release with Debug Info",
       "steps": [
         {
           "type": "configure",
-          "name": "clang-debug"
+          "name": "clang-relwithdebinfo"
         },
         {
           "type": "build",
-          "name": "clang-debug"
+          "name": "clang-relwithdebinfo"
         }
       ]
     },
     {
-      "name": "dev-gcc-release",
-      "displayName": "Dev GCC Release",
+      "name": "dev-gcc",
+      "displayName": "Dev GCC",
       "steps": [
         {
           "type": "configure",
-          "name": "dev-gcc-release"
+          "name": "dev-gcc"
         },
         {
           "type": "build",
-          "name": "dev-gcc-release"
+          "name": "dev-gcc"
         }
       ]
     },
     {
-      "name": "dev-gcc-debug",
-      "displayName": "Dev GCC Debug",
+      "name": "dev-clang",
+      "displayName": "Dev Clang",
       "steps": [
         {
           "type": "configure",
-          "name": "dev-gcc-debug"
+          "name": "dev-clang"
         },
         {
           "type": "build",
-          "name": "dev-gcc-debug"
+          "name": "dev-clang"
         }
       ]
     },
     {
-      "name": "dev-clang-release",
-      "displayName": "Dev Clang Release",
+      "name": "dev-clang-sanitized",
+      "displayName": "Dev Clang Sanitized",
       "steps": [
         {
           "type": "configure",
-          "name": "dev-clang-release"
+          "name": "dev-clang-sanitized"
         },
         {
           "type": "build",
-          "name": "dev-clang-release"
-        }
-      ]
-    },
-    {
-      "name": "dev-clang-debug",
-      "displayName": "Dev Clang Debug",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "dev-clang-debug"
-        },
-        {
-          "type": "build",
-          "name": "dev-clang-debug"
-        }
-      ]
-    },
-    {
-      "name": "dev-clang-release-sanitized",
-      "displayName": "Dev Clang Release Sanitized",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "dev-clang-release-sanitized"
-        },
-        {
-          "type": "build",
-          "name": "dev-clang-release-sanitized"
+          "name": "dev-clang-sanitized"
         }
       ]
     }
