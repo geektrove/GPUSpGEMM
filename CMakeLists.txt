@@ -9,5 +9,6 @@ project(
 
 include(cmake/ipo.cmake)
 include(cmake/dependencies.cmake)
+include(cmake/wrappers.cmake)
 
 add_subdirectory(src)
