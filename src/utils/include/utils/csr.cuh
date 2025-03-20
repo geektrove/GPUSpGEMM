@@ -21,9 +21,9 @@ struct CSR {
     std::int32_t nnz{};
     std::int32_t m{};
     std::int32_t n{};
-    std::int32_t* rows_ptr{};
-    std::int32_t* cols{};
-    T* values{};
+    std::int32_t* rpt{};
+    std::int32_t* col{};
+    T* val{};
 
     CSR() = default;
     CSR(std::int32_t nnz_, std::int32_t m_, std::int32_t n_);
@@ -47,8 +47,6 @@ struct CSR {
 
     auto release() -> void;
 
-private:
-
     static auto allocate(std::int32_t count, std::size_t size) -> void*;
 
     static auto free(void* ptr) -> void;
@@ -65,24 +63,24 @@ CSR<T, L>::CSR(const std::int32_t nnz_, const std::int32_t m_, const std::int32_
     : nnz{nnz_},
       m{m_},
       n{n_},
-      rows_ptr{static_cast<std::int32_t*>(allocate(m + 1, sizeof(std::int32_t)))},
-      cols{static_cast<std::int32_t*>(allocate(nnz, sizeof(std::int32_t)))},
-      values{static_cast<T*>(allocate(nnz, sizeof(T)))} {}
+      rpt{static_cast<std::int32_t*>(allocate(m + 1, sizeof(std::int32_t)))},
+      col{static_cast<std::int32_t*>(allocate(nnz, sizeof(std::int32_t)))},
+      val{static_cast<T*>(allocate(nnz, sizeof(T)))} {}
 
 template<std::floating_point T, Location L>
 CSR<T, L>::CSR(const CSR& other)
     : nnz{other.nnz},
       m{other.m},
       n{other.n},
-      rows_ptr{static_cast<std::int32_t*>(allocate(m + 1, sizeof(std::int32_t)))},
-      cols{static_cast<std::int32_t*>(allocate(nnz, sizeof(std::int32_t)))},
-      values{static_cast<T*>(allocate(nnz, sizeof(T)))} {
+      rpt{static_cast<std::int32_t*>(allocate(m + 1, sizeof(std::int32_t)))},
+      col{static_cast<std::int32_t*>(allocate(nnz, sizeof(std::int32_t)))},
+      val{static_cast<T*>(allocate(nnz, sizeof(T)))} {
     const auto direction = (L == Location::Host) ? cudaMemcpyHostToHost
                                                  : cudaMemcpyDeviceToDevice;
 
-    copy(rows_ptr, other.rows_ptr, m + 1, sizeof(std::int32_t), direction);
-    copy(cols, other.cols, nnz, sizeof(std::int32_t), direction);
-    copy(values, other.values, nnz, sizeof(T), direction);
+    copy(rpt, other.rpt, m + 1, sizeof(std::int32_t), direction);
+    copy(col, other.col, nnz, sizeof(std::int32_t), direction);
+    copy(val, other.val, nnz, sizeof(T), direction);
 }
 
 template<std::floating_point T, Location L>
@@ -90,9 +88,9 @@ CSR<T, L>::CSR(CSR&& other) noexcept
     : nnz{std::exchange(other.nnz, 0)},
       m{std::exchange(other.m, 0)},
       n{std::exchange(other.n, 0)},
-      rows_ptr{std::exchange(other.rows_ptr, nullptr)},
-      cols{std::exchange(other.cols, nullptr)},
-      values{std::exchange(other.values, nullptr)} {}
+      rpt{std::exchange(other.rpt, nullptr)},
+      col{std::exchange(other.col, nullptr)},
+      val{std::exchange(other.val, nullptr)} {}
 
 template<std::floating_point T, Location L>
 auto CSR<T, L>::operator=(const CSR& other) -> CSR& {
@@ -142,9 +140,9 @@ requires(L == Location::Host)
     read(&m);
     read(&n);
     CSR<T, L> csr(nnz, m, n);
-    read(csr.rows_ptr, csr.m + 1);
-    read(csr.cols, csr.nnz);
-    read(csr.values, csr.nnz);
+    read(csr.rpt, csr.m + 1);
+    read(csr.col, csr.nnz);
+    read(csr.val, csr.nnz);
 
     if (gsl::narrow_cast<unsigned long>(ifs.tellg()) < filesize)
         throw std::runtime_error("File " + filename + " is too large");
@@ -170,9 +168,9 @@ requires(L == Location::Host)
     write(&nnz);
     write(&m);
     write(&n);
-    write(rows_ptr, m + 1);
-    write(cols, nnz);
-    write(values, nnz);
+    write(rpt, m + 1);
+    write(col, nnz);
+    write(val, nnz);
 }
 
 template<std::floating_point T, Location L>
@@ -185,9 +183,9 @@ auto CSR<T, L>::to() const -> CSR<T, To> {
     const auto direction = (To == Location::Device) ? cudaMemcpyHostToDevice
                                                     : cudaMemcpyDeviceToHost;
 
-    copy(to.rows_ptr, rows_ptr, m + 1, sizeof(std::int32_t), direction);
-    copy(to.cols, cols, nnz, sizeof(std::int32_t), direction);
-    copy(to.values, values, nnz, sizeof(T), direction);
+    copy(to.rpt, rpt, m + 1, sizeof(std::int32_t), direction);
+    copy(to.col, col, nnz, sizeof(std::int32_t), direction);
+    copy(to.val, val, nnz, sizeof(T), direction);
 
     return to;
 }
@@ -198,22 +196,22 @@ auto swap(CSR<T, L>& lhs, CSR<T, L>& rhs) noexcept -> void {
     swap(lhs.nnz, rhs.nnz);
     swap(lhs.m, rhs.m);
     swap(lhs.n, rhs.n);
-    swap(lhs.rows_ptr, rhs.rows_ptr);
-    swap(lhs.cols, rhs.cols);
-    swap(lhs.values, rhs.values);
+    swap(lhs.rpt, rhs.rpt);
+    swap(lhs.col, rhs.col);
+    swap(lhs.val, rhs.val);
 }
 
 template<std::floating_point T, Location L>
 auto CSR<T, L>::release() -> void {
-    free(rows_ptr);
-    free(cols);
-    free(values);
+    free(rpt);
+    free(col);
+    free(val);
     nnz = 0;
     m = 0;
     n = 0;
-    rows_ptr = nullptr;
-    cols = nullptr;
-    values = nullptr;
+    rpt = nullptr;
+    col = nullptr;
+    val = nullptr;
 }
 
 template<std::floating_point T, Location L>

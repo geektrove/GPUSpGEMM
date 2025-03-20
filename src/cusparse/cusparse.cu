@@ -21,9 +21,9 @@ auto spgemm_cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                                    a.m,
                                                    a.n,
                                                    a.nnz,
-                                                   a.rows_ptr,
-                                                   a.cols,
-                                                   a.values,
+                                                   a.rpt,
+                                                   a.col,
+                                                   a.val,
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_BASE_ZERO,
@@ -33,9 +33,9 @@ auto spgemm_cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                                    b.m,
                                                    b.n,
                                                    b.nnz,
-                                                   b.rows_ptr,
-                                                   b.cols,
-                                                   b.values,
+                                                   b.rpt,
+                                                   b.col,
+                                                   b.val,
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_BASE_ZERO,
@@ -142,7 +142,7 @@ auto spgemm_cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
 
     // Extract the result matrix
     utils::handle_cusparse_error(
-        cusparseCsrSetPointers(desc_c, d_c.rows_ptr, d_c.cols, d_c.values));
+        cusparseCsrSetPointers(desc_c, d_c.rpt, d_c.col, d_c.val));
     utils::handle_cusparse_error(cusparseSpGEMM_copy(handle,
                                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
