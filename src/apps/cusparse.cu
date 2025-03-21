@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <thread>
 
 #include <cusparse.h>
 #include <fmt/base.h>
@@ -6,6 +7,8 @@
 
 #include <cusparse/cusparse.cuh>
 #include <utils/utils.cuh>
+
+constexpr auto SLEEP_TIME = std::chrono::milliseconds(100);
 
 auto main(int argc, char** argv) -> int {
     // Load the matrices
@@ -23,10 +26,9 @@ auto main(int argc, char** argv) -> int {
     const auto d_b = h_b.to<utils::Location::Device>();
 
     // Warm up the GPU
-    {
-        utils::cudaruntime_warmup();
-        auto d_c = cusparse(d_a, d_b);
-    }
+    cusparse(d_a, d_b);
+    cudaDeviceSynchronize();
+    std::this_thread::sleep_for(SLEEP_TIME);
 
     // Execute
     const auto d_c = cusparse(d_a, d_b);
