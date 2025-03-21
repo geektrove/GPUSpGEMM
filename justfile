@@ -1,4 +1,4 @@
-#!/usr/bin/env just --justfile
+#!/usr/bin/env -S just --justfile
 
 preset := "dev-clang"
 build_path := "build/" + preset
@@ -11,16 +11,13 @@ benchmark_options := "\
 default:
     just --list
 
-clean:
-    rm -rf build/
-
 configure:
     cmake --preset={{ preset }}
 
 compdb:
     compdb -p {{ build_path }} list >compile_commands.json
 
-refresh: clean configure compdb
+refresh: configure compdb
 
 build:
     cmake --build --preset={{ preset }}
@@ -37,3 +34,4 @@ format:
 
 benchmark inputA="data/csr/webbase-1M.csr" inputB="data/csr/webbase-1M.csr": build
     "{{ build_path }}/src/apps/cusparse_benchmark" "{{ inputA }}" "{{ inputB }}" {{ benchmark_options }}
+    "{{ build_path }}/src/apps/opsparse_benchmark" "{{ inputA }}" "{{ inputB }}" {{ benchmark_options }}
