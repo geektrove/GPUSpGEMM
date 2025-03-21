@@ -3,4 +3,3 @@
 #include <utils/csr.cuh>
 #include <utils/errors.cuh>
 #include <utils/nip.cuh>
-#include <utils/warmup.cuh>
