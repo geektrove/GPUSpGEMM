@@ -43,7 +43,7 @@ struct CSR {
     auto to() const -> CSR<T, To>;
 
     template<std::floating_point T_, Location L_>
-    friend auto swap(CSR<T_, L_>&, CSR<T_, L_>) noexcept -> void;
+    friend auto swap(CSR<T_, L_>&, CSR<T_, L_>&) noexcept -> void;
 
     auto release() -> void;
 
@@ -191,7 +191,9 @@ auto CSR<T, L>::to() const -> CSR<T, To> {
 }
 
 template<std::floating_point T, Location L>
-auto swap(CSR<T, L>& lhs, CSR<T, L>& rhs) noexcept -> void {
+inline auto swap(CSR<T, L>& lhs, CSR<T, L>& rhs) noexcept -> void {
+    if (&lhs == &rhs)
+        return;
     using std::swap;
     swap(lhs.nnz, rhs.nnz);
     swap(lhs.m, rhs.m);
