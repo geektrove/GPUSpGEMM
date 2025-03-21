@@ -4,3 +4,7 @@ target_link_libraries(cusparse PRIVATE libcusparse)
 add_executable_wrapped(cusparse_benchmark cusparse_benchmark.cu)
 target_link_libraries(cusparse_benchmark PRIVATE libcusparse)
 target_link_libraries(cusparse_benchmark PRIVATE benchmark::benchmark)
+
+add_executable_wrapped(opsparse opsparse.cu)
+target_link_libraries(opsparse PRIVATE libopsparse)
+
