@@ -8,3 +8,6 @@ target_link_libraries(cusparse_benchmark PRIVATE benchmark::benchmark)
 add_executable_wrapped(opsparse opsparse.cu)
 target_link_libraries(opsparse PRIVATE libopsparse)
 
+add_executable_wrapped(opsparse_benchmark opsparse_benchmark.cu)
+target_link_libraries(opsparse_benchmark PRIVATE libopsparse)
+target_link_libraries(opsparse_benchmark PRIVATE benchmark::benchmark)
