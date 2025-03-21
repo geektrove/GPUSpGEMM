@@ -1,7 +1,8 @@
 #pragma once
 
-#include <CSR.h>
 #include <utils/utils.cuh>
+
+#include "CSR.h"
 
 inline auto convertFromUtilsCSR(const utils::HostCSR<mdouble>& from) -> CSR {
     CSR to;

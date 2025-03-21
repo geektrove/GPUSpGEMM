@@ -1,5 +1,5 @@
 add_subdirectory(apps)
 
-add_subdirectory(opsparse)
 add_subdirectory(libcusparse)
+add_subdirectory(libopsparse)
 add_subdirectory(utils)
