@@ -29,7 +29,7 @@ void benchmark_cusparse(benchmark::State& state,
 
         const auto start = std::chrono::high_resolution_clock::now();
         auto d_c = cusparse(d_a, d_b);
-        cudaDeviceSynchronize();
+        utils::handle_cuda_error(cudaDeviceSynchronize());
         const auto end = std::chrono::high_resolution_clock::now();
         const auto seconds = std::chrono::duration<double>(end - start).count();
         state.SetIterationTime(seconds);
