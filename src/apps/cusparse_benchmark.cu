@@ -4,9 +4,7 @@
 #include <thread>
 
 #include <benchmark/benchmark.h>
-#include <cusparse.h>
 #include <fmt/base.h>
-#include <gsl/gsl-lite.hpp>
 
 #include <cusparse/cusparse.cuh>
 #include <utils/utils.cuh>
