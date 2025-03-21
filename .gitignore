@@ -1,6 +1,7 @@
 # IDEs
 /.vscode/
 /.idea/
+/__cmake_systeminformation/
 
 # Dev
 CMakeUserPresets.json
