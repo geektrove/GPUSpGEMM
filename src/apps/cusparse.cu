@@ -11,13 +11,15 @@
 constexpr auto SLEEP_TIME = std::chrono::milliseconds(100);
 
 auto main(int argc, char** argv) -> int {
+    using ValueType = double;
+
     // Load the matrices
     if (argc != 4) {
         fmt::println("Usage: {} <input:A> <input:B> <output>", argv[0]);
         return EXIT_FAILURE;
     }
-    const auto h_a = utils::HostCSR<double>::load_from_filename(argv[1]);
-    const auto h_b = utils::HostCSR<double>::load_from_filename(argv[2]);
+    const auto h_a = utils::HostCSR<ValueType>::load_from_filename(argv[1]);
+    const auto h_b = utils::HostCSR<ValueType>::load_from_filename(argv[2]);
     if (h_a.n != h_b.m) {
         fmt::println("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
         return EXIT_FAILURE;
