@@ -130,7 +130,6 @@
       "inherits": [
         "clang-relwithdebinfo",
         "dev-base",
-        "dev-clang-warnings",
         "dev-clang-sanitizers"
       ]
     }
