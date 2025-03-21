@@ -15,8 +15,8 @@ constexpr auto SLEEP_TIME = std::chrono::milliseconds(100);
 
 template<std::floating_point T>
 void benchmark_cusparse(benchmark::State& state,
-                        const utils::DeviceCSR<T>& d_a,
-                        const utils::DeviceCSR<T>& d_b) {
+                        const utils::DeviceCSR<T>& a,
+                        const utils::DeviceCSR<T>& b) {
     for (auto _ : state) {
         // Very important observation:
         // It seems like even after the SpGEMM call returns,
@@ -28,7 +28,7 @@ void benchmark_cusparse(benchmark::State& state,
         std::this_thread::sleep_for(SLEEP_TIME);
 
         const auto start = std::chrono::high_resolution_clock::now();
-        auto d_c = cusparse(d_a, d_b);
+        auto c = cusparse(a, b);
         utils::handle_cuda_error(cudaDeviceSynchronize());
         const auto end = std::chrono::high_resolution_clock::now();
         const auto seconds = std::chrono::duration<double>(end - start).count();
@@ -55,9 +55,11 @@ auto main(int argc, char** argv) -> int {
     const auto d_a = h_a.to<utils::Location::Device>();
     const auto d_b = h_b.to<utils::Location::Device>();
 
+    // Register the benchmark
     benchmark::RegisterBenchmark("cusparse", benchmark_cusparse<ValueType>, d_a, d_b)
         ->UseManualTime();
 
+    // Run the benchmark
     benchmark::Initialize(&argc, argv);
     benchmark::AddCustomContext("Matrix A", argv[1]);
     benchmark::AddCustomContext("Matrix B", argv[2]);
