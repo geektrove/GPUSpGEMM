@@ -22,12 +22,6 @@ auto main(int argc, char** argv) -> int {
     const auto d_a = h_a.to<utils::Location::Device>();
     const auto d_b = h_b.to<utils::Location::Device>();
 
-    // Compute NIP
-    const auto nip = utils::get_nip(d_a, d_b);
-    fmt::println("NIP: {}", nip);
-    const auto flop = 2 * nip;
-    fmt::println("FLOP: {}", flop);
-
     // Warm up the GPU
     {
         utils::cudaruntime_warmup();
