@@ -6,6 +6,7 @@
 # Dev
 CMakeUserPresets.json
 compile_commands.json
+justfile
 
 # Auxiliary
 /.cache/
