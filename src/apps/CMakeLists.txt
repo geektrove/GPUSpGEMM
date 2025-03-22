@@ -11,3 +11,10 @@ target_link_libraries(opsparse PRIVATE libopsparse)
 add_executable_wrapped(opsparse_benchmark opsparse_benchmark.cu)
 target_link_libraries(opsparse_benchmark PRIVATE libopsparse)
 target_link_libraries(opsparse_benchmark PRIVATE benchmark::benchmark)
+
+add_executable_wrapped(proposal proposal.cu)
+target_link_libraries(proposal PRIVATE libproposal)
+
+add_executable_wrapped(proposal_benchmark proposal_benchmark.cu)
+target_link_libraries(proposal_benchmark PRIVATE libproposal)
+target_link_libraries(proposal_benchmark PRIVATE benchmark::benchmark)
