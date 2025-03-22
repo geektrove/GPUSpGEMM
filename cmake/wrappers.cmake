@@ -31,4 +31,5 @@ function(_customize_target_wrapped name visibility)
 
     target_link_libraries(${name} ${visibility} gsl-lite)
     target_link_libraries(${name} ${visibility} fmt::fmt)
+    target_link_libraries(${name} ${visibility} spdlog::spdlog)
 endfunction()
