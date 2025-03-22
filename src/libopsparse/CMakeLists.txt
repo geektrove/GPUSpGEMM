@@ -1,4 +1,5 @@
-add_library_wrapped(libopsparse PUBLIC src/CSR.cu src/Meta.cu src/Timings.cu src/OpSparse.cu)
+add_library_wrapped(libopsparse PUBLIC src/CSR.cu src/Meta.cu src/Timings.cu
+                    src/OpSparse.cu)
 target_include_directories(libopsparse PUBLIC include)
 target_include_directories(libopsparse PRIVATE include/opsparse)
 
