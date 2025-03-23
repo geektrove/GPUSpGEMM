@@ -28,6 +28,12 @@ function(_customize_target_wrapped name visibility)
 
     target_compile_definitions(${name} ${visibility}
                                        CUDA_API_PER_THREAD_DEFAULT_STREAM)
+    target_compile_definitions(
+        ${name}
+        ${visibility}
+        $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_WARN>
+        $<$<CONFIG:Debug,RelWithDebInfo>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>
+    )
 
     target_link_libraries(${name} ${visibility} gsl-lite)
     target_link_libraries(${name} ${visibility} fmt::fmt)
