@@ -5,6 +5,7 @@
 
 #include <benchmark/benchmark.h>
 #include <fmt/base.h>
+#include <spdlog/cfg/env.h>
 
 #include <proposal/proposal.cuh>
 #include <utils/utils.cuh>
@@ -40,6 +41,9 @@ void benchmark_proposal(benchmark::State& state,
 
 auto main(int argc, char** argv) -> int {
     using ValueType = double;
+
+    // Initialize logging
+    spdlog::cfg::load_env_levels();
 
     // Load the matrices
     if (argc < 3) {

@@ -2,6 +2,7 @@
 #include <thread>
 
 #include <fmt/base.h>
+#include <spdlog/cfg/env.h>
 
 #include <opsparse/conversion.cuh>
 #include <opsparse/opsparse.h>
@@ -11,6 +12,9 @@ constexpr auto SLEEP_TIME = std::chrono::milliseconds(100);
 
 auto main(int argc, char** argv) -> int {
     using ValueType = double;
+
+    // Initialize logging
+    spdlog::cfg::load_env_levels();
 
     // Load the matrices
     if (argc != 4) {
