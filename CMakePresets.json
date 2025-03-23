@@ -7,67 +7,25 @@
       "binaryDir": "${sourceDir}/build/${presetName}",
       "generator": "Ninja",
       "cacheVariables": {
-        "CMAKE_CUDA_ARCHITECTURES": "86"
-      }
-    },
-    {
-      "name": "gcc",
-      "hidden": true,
-      "cacheVariables": {
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
-        "CMAKE_CUDA_COMPILER": "nvcc"
+        "CMAKE_CUDA_COMPILER": "nvcc",
+        "CMAKE_CUDA_HOST_COMPILER": "g++",
+        "CMAKE_CUDA_ARCHITECTURES": "80;86;89"
       }
     },
     {
-      "name": "clang",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_CUDA_COMPILER": "clang++"
-      }
-    },
-    {
-      "name": "gcc-release",
-      "displayName": "GCC Release",
-      "inherits": [
-        "base",
-        "gcc"
-      ],
+      "name": "release",
+      "displayName": "Release",
+      "inherits": ["base"],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
-      "name": "gcc-relwithdebinfo",
-      "displayName": "GCC Release with Debug Info",
-      "inherits": [
-        "base",
-        "gcc"
-      ],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
-    },
-    {
-      "name": "clang-release",
-      "displayName": "Clang Release",
-      "inherits": [
-        "base",
-        "clang"
-      ],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
-    },
-    {
-      "name": "clang-relwithdebinfo",
-      "displayName": "Clang Release with Debug Info",
-      "inherits": [
-        "base",
-        "clang"
-      ],
+      "name": "relwithdebinfo",
+      "displayName": "Release with debug info",
+      "inherits": ["base"],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
@@ -83,190 +41,72 @@
       }
     },
     {
-      "name": "dev-gcc-warnings",
-      "hidden": true,
+      "name": "dev",
+      "displayName": "Development",
+      "inherits": ["relwithdebinfo", "dev-base"],
       "cacheVariables": {
         "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wshadow",
         "CMAKE_CUDA_FLAGS": "--Wreorder --Wdefault-stream-launch --Wmissing-launch-bounds --Wext-lambda-captures-this -Xptxas --warn-on-local-memory-usage,--warn-on-spills -Xcompiler -Wall,-Wextra,-Wnon-virtual-dtor,-Wunused,-Wshadow"
       }
-    },
-    {
-      "name": "dev-clang-warnings",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wshadow",
-        "CMAKE_CUDA_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wshadow -Wnvcc-compat"
-      }
-    },
-    {
-      "name": "dev-clang-sanitizers",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined,leak -fno-omit-frame-pointer",
-        "CMAKE_CUDA_FLAGS": "-fsanitize=address,undefined,leak -fno-omit-frame-pointer"
-      }
-    },
-    {
-      "name": "dev-gcc",
-      "displayName": "Dev GCC",
-      "inherits": [
-        "gcc-relwithdebinfo",
-        "dev-base",
-        "dev-gcc-warnings"
-      ]
-    },
-    {
-      "name": "dev-clang",
-      "displayName": "Dev Clang",
-      "inherits": [
-        "clang-relwithdebinfo",
-        "dev-base",
-        "dev-clang-warnings"
-      ]
-    },
-    {
-      "name": "dev-clang-sanitized",
-      "displayName": "Dev Clang Sanitized",
-      "inherits": [
-        "clang-relwithdebinfo",
-        "dev-base",
-        "dev-clang-sanitizers"
-      ]
     }
   ],
   "buildPresets": [
     {
-      "name": "gcc-release",
-      "displayName": "GCC Release",
-      "configurePreset": "gcc-release"
+      "name": "release",
+      "displayName": "Release",
+      "configurePreset": "release"
     },
     {
-      "name": "gcc-relwithdebinfo",
-      "displayName": "GCC Release with Debug Info",
-      "configurePreset": "gcc-relwithdebinfo"
+      "name": "relwithdebinfo",
+      "displayName": "Release with debug info",
+      "configurePreset": "relwithdebinfo"
     },
     {
-      "name": "clang-release",
-      "displayName": "Clang Release",
-      "configurePreset": "clang-release"
-    },
-    {
-      "name": "clang-relwithdebinfo",
-      "displayName": "Clang Release with Debug Info",
-      "configurePreset": "clang-relwithdebinfo"
-    },
-    {
-      "name": "dev-gcc",
-      "displayName": "Dev GCC",
-      "configurePreset": "dev-gcc"
-    },
-    {
-      "name": "dev-clang",
-      "displayName": "Dev Clang",
-      "configurePreset": "dev-clang"
-    },
-    {
-      "name": "dev-clang-sanitized",
-      "displayName": "Dev Clang Sanitized",
-      "configurePreset": "dev-clang-sanitized"
+      "name": "dev",
+      "displayName": "Development",
+      "configurePreset": "dev"
     }
   ],
   "workflowPresets": [
     {
-      "name": "gcc-release",
-      "displayName": "GCC Release",
+      "name": "release",
+      "displayName": "Release",
       "steps": [
         {
           "type": "configure",
-          "name": "gcc-release"
+          "name": "release"
         },
         {
           "type": "build",
-          "name": "gcc-release"
+          "name": "release"
         }
       ]
     },
     {
-      "name": "gcc-relwithdebinfo",
-      "displayName": "GCC Release with Debug Info",
+      "name": "relwithdebinfo",
+      "displayName": "Release with debug info",
       "steps": [
         {
           "type": "configure",
-          "name": "gcc-relwithdebinfo"
+          "name": "relwithdebinfo"
         },
         {
           "type": "build",
-          "name": "gcc-relwithdebinfo"
+          "name": "relwithdebinfo"
         }
       ]
     },
     {
-      "name": "clang-release",
-      "displayName": "Clang Release",
+      "name": "dev",
+      "displayName": "Development",
       "steps": [
         {
           "type": "configure",
-          "name": "clang-release"
+          "name": "dev"
         },
         {
           "type": "build",
-          "name": "clang-release"
-        }
-      ]
-    },
-    {
-      "name": "clang-relwithdebinfo",
-      "displayName": "Clang Release with Debug Info",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "clang-relwithdebinfo"
-        },
-        {
-          "type": "build",
-          "name": "clang-relwithdebinfo"
-        }
-      ]
-    },
-    {
-      "name": "dev-gcc",
-      "displayName": "Dev GCC",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "dev-gcc"
-        },
-        {
-          "type": "build",
-          "name": "dev-gcc"
-        }
-      ]
-    },
-    {
-      "name": "dev-clang",
-      "displayName": "Dev Clang",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "dev-clang"
-        },
-        {
-          "type": "build",
-          "name": "dev-clang"
-        }
-      ]
-    },
-    {
-      "name": "dev-clang-sanitized",
-      "displayName": "Dev Clang Sanitized",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "dev-clang-sanitized"
-        },
-        {
-          "type": "build",
-          "name": "dev-clang-sanitized"
+          "name": "dev"
         }
       ]
     }
