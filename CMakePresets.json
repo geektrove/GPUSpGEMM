@@ -17,7 +17,9 @@
     {
       "name": "release",
       "displayName": "Release",
-      "inherits": ["base"],
+      "inherits": [
+        "base"
+      ],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
@@ -25,7 +27,9 @@
     {
       "name": "relwithdebinfo",
       "displayName": "Release with debug info",
-      "inherits": ["base"],
+      "inherits": [
+        "base"
+      ],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
@@ -43,7 +47,10 @@
     {
       "name": "dev",
       "displayName": "Development",
-      "inherits": ["relwithdebinfo", "dev-base"],
+      "inherits": [
+        "relwithdebinfo",
+        "dev-base"
+      ],
       "cacheVariables": {
         "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wshadow",
         "CMAKE_CUDA_FLAGS": "--Wreorder --Wdefault-stream-launch --Wmissing-launch-bounds --Wext-lambda-captures-this -Xptxas --warn-on-local-memory-usage,--warn-on-spills -Xcompiler -Wall,-Wextra,-Wnon-virtual-dtor,-Wunused,-Wshadow"
