@@ -1,10 +1,8 @@
 #include <cub/cub.cuh>
-#include <cuda_profiler_api.h>
 #include <spdlog/spdlog.h>
 
 #include <utils/utils.cuh>
 
-#include "conversion.cuh"
 #include "kernel_wrapper.cuh"
 #include "opsparse.h"
 #include "Timings.h"
