@@ -3,6 +3,7 @@
 
 #include <cusparse.h>
 #include <gsl/gsl-lite.hpp>
+#include <spdlog/spdlog.h>
 
 #include <utils/utils.cuh>
 
@@ -75,6 +76,7 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                       spgemm_desc,
                                       &buffer1_size,
                                       nullptr));
+    SPDLOG_DEBUG("Buffer 1 size is {}", buffer1_size);
     void* buffer1{};
     utils::handle_cuda_error(cudaMalloc(&buffer1, buffer1_size));
     utils::handle_cusparse_error(
@@ -107,6 +109,7 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                                         spgemm_desc,
                                                         &buffer2_size,
                                                         nullptr));
+    SPDLOG_DEBUG("Buffer 2 size is {}", buffer2_size);
     void* buffer2{};
     utils::handle_cuda_error(cudaMalloc(&buffer2, buffer2_size));
     utils::handle_cusparse_error(cusparseSpGEMM_compute(handle,
