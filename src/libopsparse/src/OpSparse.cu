@@ -1,5 +1,6 @@
 #include <cub/cub.cuh>
 #include <cuda_profiler_api.h>
+#include <spdlog/spdlog.h>
 
 #include <utils/utils.cuh>
 
@@ -17,6 +18,7 @@ void opsparse(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
     h_setup(A, B, C, meta, timing);
     CHECK_ERROR(cudaDeviceSynchronize());
     timing.setup = fast_clock_time() - t0;
+    SPDLOG_DEBUG("Maximum NIP per row in C: {}", *meta.max_row_nnz);
 
     // symbolic binning
     t0 = fast_clock_time();
