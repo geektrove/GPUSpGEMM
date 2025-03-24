@@ -58,6 +58,10 @@ void setup(const utils::DeviceCSR<T>& A,
     meta.max_row_nnz = meta.bin_offsets + N_BINS;
     meta.total_nnz = meta.max_row_nnz + 1;
 
+    utils::handle_cuda_error(cudaMemPrefetchAsync(meta.max_row_nnz,
+                                                  sizeof(std::int32_t),
+                                                  cudaCpuDeviceId,
+                                                  meta.streams[0]));
     utils::handle_cuda_error(cudaMemcpyAsync(meta.max_row_nnz,
                                              C.rpt + C.m,
                                              sizeof(std::int32_t),
