@@ -17,6 +17,7 @@ __global__ void k_compute_nip(const std::int32_t* __restrict__ a_rpt,
                               std::int32_t* __restrict__ max_nip) {
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
+    // TODO: Compute optimal block dimensions
     const auto tile = cg::tiled_partition<1024>(block);
 
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
