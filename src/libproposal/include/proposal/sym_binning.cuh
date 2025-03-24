@@ -32,6 +32,8 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta) {
     if (*meta.h_max_row_nnz <= SYM_BIN_RANGES[0]) {
         // If all rows fall into the smallest bin, we can skip the binning process
         // and directly assign the row indices to the smallest bin
+        SPDLOG_DEBUG("Performing symbolic binning small, max nip is {}",
+                     *meta.h_max_row_nnz);
 
         auto op = [d_bins = meta.d_bins] __device__(int i) {
             d_bins[i] = static_cast<std::int32_t>(i);
@@ -61,6 +63,8 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta) {
     }
 
     // Perform full two-stage symbolic binning
+    SPDLOG_DEBUG("Performing symbolic binning full, max nip is {}", *meta.h_max_row_nnz);
+
     utils::handle_cuda_error(
         cudaMemsetAsync(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t)));
 
