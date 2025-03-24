@@ -22,8 +22,13 @@ function(_customize_target_wrapped name visibility)
 
     if(${CMAKE_CUDA_COMPILER_ID} STREQUAL "NVIDIA")
         target_compile_options(
-            ${name} ${visibility} --extra-device-vectorization --use_fast_math
-            --restrict --expt-relaxed-constexpr)
+            ${name}
+            ${visibility}
+            --extra-device-vectorization
+            --use_fast_math
+            --restrict
+            --expt-relaxed-constexpr
+            --extended-lambda)
     endif()
 
     target_compile_definitions(${name} ${visibility}
