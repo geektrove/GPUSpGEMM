@@ -7,6 +7,7 @@
 
 #include <utils/utils.cuh>
 
+#include <proposal/cleanup.cuh>
 #include <proposal/meta.cuh>
 #include <proposal/setup.cuh>
 #include <proposal/sym_binning.cuh>
@@ -25,6 +26,9 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     // Symbolic binning
     sym_binning(C, meta);
+
+    // Cleanup
+    cleanup(meta);
 
     return C;
 }
