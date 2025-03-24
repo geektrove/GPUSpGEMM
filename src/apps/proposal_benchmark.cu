@@ -68,7 +68,7 @@ auto main(int argc, char** argv) -> int {
     const auto d_b = h_b.to<utils::Location::Device>();
 
     // Register the benchmark
-    benchmark::RegisterBenchmark("cusparse", benchmark_proposal<ValueType>, d_a, d_b)
+    benchmark::RegisterBenchmark("proposal", benchmark_proposal<ValueType>, d_a, d_b)
         ->UseManualTime();
 
     // Run the benchmark
