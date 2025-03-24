@@ -13,7 +13,7 @@ __global__ void k_compute_nip(const std::int32_t* __restrict__ a_rpt,
                               const std::int32_t* __restrict__ a_col,
                               const std::int32_t* __restrict__ b_rpt,
                               const std::int32_t m,
-                              std::int32_t* __restrict__ nip,
+                              std::int32_t* __restrict__ nips,
                               std::int32_t* __restrict__ max_nip) {
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
@@ -28,7 +28,7 @@ __global__ void k_compute_nip(const std::int32_t* __restrict__ a_rpt,
             const auto col = a_col[j];
             row_nip += b_rpt[col + 1] - b_rpt[col];
         }
-        nip[row] = row_nip;
+        nips[row] = row_nip;
         return row_nip;
     });
 

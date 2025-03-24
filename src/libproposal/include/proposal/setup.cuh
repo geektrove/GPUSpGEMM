@@ -14,7 +14,7 @@ __global__ void k_compute_nip(const std::int32_t* __restrict__ a_rpt,
                               const std::int32_t* __restrict__ a_col,
                               const std::int32_t* __restrict__ b_rpt,
                               std::int32_t m,
-                              std::int32_t* __restrict__ nip,
+                              std::int32_t* __restrict__ nips,
                               std::int32_t* __restrict__ max_nip);
 
 template<std::floating_point T>
@@ -34,7 +34,7 @@ void setup(const utils::DeviceCSR<T>& A,
         cudaMemsetAsync(C.rpt + C.m, 0, sizeof(std::int32_t), meta.streams[0]));
 
     // TODO: Compute optimal grid dimensions
-    constexpr auto BLOCK_SIZE = 1024;
+    static constexpr auto BLOCK_SIZE = 1024;
     const auto n_blocks = cuda::ceil_div(C.m, BLOCK_SIZE);
     k_compute_nip<<<n_blocks, BLOCK_SIZE, 0, meta.streams[0]>>>(A.rpt,
                                                                 A.col,
@@ -42,13 +42,13 @@ void setup(const utils::DeviceCSR<T>& A,
                                                                 C.m,
                                                                 C.rpt,
                                                                 C.rpt + C.m);
-    utils::handle_cuda_error(cudaDeviceSynchronize());
 
-    cub::DeviceScan::ExclusiveSum(nullptr,
-                                  meta.cub_storage_size,
-                                  static_cast<std::int32_t*>(nullptr),
-                                  static_cast<std::int32_t*>(nullptr),
-                                  C.m + 1);
+    utils::handle_cuda_error(
+        cub::DeviceScan::ExclusiveSum(nullptr,
+                                      meta.cub_storage_size,
+                                      static_cast<std::int32_t*>(nullptr),
+                                      static_cast<std::int32_t*>(nullptr),
+                                      C.m + 1));
     const auto device_mem_size = C.m * sizeof(std::int32_t) + meta.cub_storage_size;
     utils::handle_cuda_error(
         cudaMallocAsync(&meta.device_ptr, device_mem_size, meta.streams[1]));
