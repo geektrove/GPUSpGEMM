@@ -12,6 +12,7 @@
 
 namespace {
 
+constexpr int WARMUP_ITERATIONS = 10;
 constexpr auto SLEEP_TIME = std::chrono::milliseconds(100);
 
 template<std::floating_point T>
@@ -23,6 +24,16 @@ void benchmark_opsparse(benchmark::State& state,
     CSR B = convertFromUtilsCSR(b);
     A.H2D();
     B.H2D();
+
+    // Warmup
+    for (int i = 0; i < WARMUP_ITERATIONS; i++) {
+        CSR C;
+        Meta meta;
+        Timings timing;
+        std::this_thread::sleep_for(SLEEP_TIME);
+        opsparse(A, B, C, meta, timing);
+        utils::handle_cuda_error(cudaDeviceSynchronize());
+    }
 
     for (auto _ : state) {
         CSR C;

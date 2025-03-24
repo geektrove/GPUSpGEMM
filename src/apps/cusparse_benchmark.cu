@@ -12,12 +12,20 @@
 
 namespace {
 
+constexpr int WARMUP_ITERATIONS = 10;
 constexpr auto SLEEP_TIME = std::chrono::milliseconds(100);
 
 template<std::floating_point T>
 void benchmark_cusparse(benchmark::State& state,
                         const utils::DeviceCSR<T>& a,
                         const utils::DeviceCSR<T>& b) {
+    // Warmup
+    for (int i = 0; i < WARMUP_ITERATIONS; i++) {
+        std::this_thread::sleep_for(SLEEP_TIME);
+        auto c = cusparse(a, b);
+        utils::handle_cuda_error(cudaDeviceSynchronize());
+    }
+
     for (auto _ : state) {
         // Very important observation:
         // It seems like even after the SpGEMM call returns,
