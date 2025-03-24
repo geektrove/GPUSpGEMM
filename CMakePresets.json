@@ -45,7 +45,7 @@
         "CMAKE_CUDA_COMPILER_LAUNCHER": "ccache",
         "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wnon-virtual-dtor -Wunused -Wshadow",
         "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g",
-        "CMAKE_CUDA_FLAGS": "--Wreorder --Wdefault-stream-launch --Wmissing-launch-bounds --Wext-lambda-captures-this -Xptxas --warn-on-local-memory-usage,--warn-on-spills -Xcompiler -Wall,-Wextra,-Wnon-virtual-dtor,-Wunused,-Wshadow",
+        "CMAKE_CUDA_FLAGS": "--Wreorder --Wext-lambda-captures-this -Xptxas --warn-on-local-memory-usage,--warn-on-spills -Xcompiler -Wall,-Wextra,-Wnon-virtual-dtor,-Wunused,-Wshadow",
         "CMAKE_CUDA_FLAGS_RELWITHDEBINFO": "-O2 -g"
       }
     }
