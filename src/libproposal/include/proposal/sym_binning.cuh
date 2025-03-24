@@ -41,8 +41,7 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta) {
 
         if constexpr (utils::IS_DEBUG) {
             size_t cub_requested{};
-            utils::handle_cuda_error(
-                cub::DeviceFor::Bulk(nullptr, cub_requested, C.m, op));
+            cub::DeviceFor::Bulk(nullptr, cub_requested, C.m, op);
             assert(cub_requested <= meta.cub_storage_size);
         }
 

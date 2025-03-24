@@ -37,12 +37,11 @@ void setup(const utils::DeviceCSR<T>& A,
     for (auto& stream : meta.streams)
         utils::handle_cuda_error(cudaStreamCreate(&stream));
 
-    utils::handle_cuda_error(
-        cub::DeviceScan::ExclusiveSum(nullptr,
-                                      meta.cub_storage_size,
-                                      static_cast<std::int32_t*>(nullptr),
-                                      static_cast<std::int32_t*>(nullptr),
-                                      C.m + 1));
+    cub::DeviceScan::ExclusiveSum(nullptr,
+                                  meta.cub_storage_size,
+                                  static_cast<std::int32_t*>(nullptr),
+                                  static_cast<std::int32_t*>(nullptr),
+                                  C.m + 1);
     const auto d_memsize = (C.m + 2 * N_BINS + 2) * sizeof(std::int32_t)
                            + meta.cub_storage_size;
     utils::handle_cuda_error(cudaMallocAsync(&meta.d_bins, d_memsize, meta.streams[0]));
