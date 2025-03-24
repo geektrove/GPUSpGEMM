@@ -25,23 +25,17 @@ void setup(const utils::DeviceCSR<T>& A,
     C.m = A.m;
     C.n = B.n;
 
-    for (auto* stream : meta.streams)
-        utils::handle_cuda_error(cudaStreamCreate(&stream));
-
     utils::handle_cuda_error(
-        cudaMallocAsync(&C.rpt, (C.m + 1) * sizeof(std::int32_t), meta.streams[0]));
-    utils::handle_cuda_error(
-        cudaMemsetAsync(C.rpt + C.m, 0, sizeof(std::int32_t), meta.streams[0]));
+        cudaMallocAsync(&C.rpt, (C.m + 1) * sizeof(std::int32_t), cudaStreamDefault));
+    utils::handle_cuda_error(cudaMemsetAsync(C.rpt + C.m, 0, sizeof(std::int32_t)));
 
     // TODO: Compute optimal grid dimensions
     static constexpr auto BLOCK_SIZE = 1024;
     const auto n_blocks = cuda::ceil_div(C.m, BLOCK_SIZE);
-    k_compute_nip<<<n_blocks, BLOCK_SIZE, 0, meta.streams[0]>>>(A.rpt,
-                                                                A.col,
-                                                                B.rpt,
-                                                                C.m,
-                                                                C.rpt,
-                                                                C.rpt + C.m);
+    k_compute_nip<<<n_blocks, BLOCK_SIZE>>>(A.rpt, A.col, B.rpt, C.m, C.rpt, C.rpt + C.m);
+
+    for (auto& stream : meta.streams)
+        utils::handle_cuda_error(cudaStreamCreate(&stream));
 
     utils::handle_cuda_error(
         cub::DeviceScan::ExclusiveSum(nullptr,
@@ -51,7 +45,7 @@ void setup(const utils::DeviceCSR<T>& A,
                                       C.m + 1));
     const auto d_memsize = (C.m + 2 * N_BINS + 2) * sizeof(std::int32_t)
                            + meta.cub_storage_size;
-    utils::handle_cuda_error(cudaMallocAsync(&meta.d_bins, d_memsize, meta.streams[1]));
+    utils::handle_cuda_error(cudaMallocAsync(&meta.d_bins, d_memsize, meta.streams[0]));
 
     const auto h_memsize = (2 * N_BINS + 2) * sizeof(std::int32_t);
     utils::handle_cuda_error(cudaMallocHost(&meta.h_bin_sizes, h_memsize));
@@ -62,14 +56,13 @@ void setup(const utils::DeviceCSR<T>& A,
     utils::handle_cuda_error(cudaMemcpyAsync(meta.h_max_row_nnz,
                                              C.rpt + C.m,
                                              sizeof(std::int32_t),
-                                             cudaMemcpyDeviceToHost,
-                                             meta.streams[0]));
+                                             cudaMemcpyDeviceToHost));
 
-    utils::handle_cuda_error(cudaStreamSynchronize(meta.streams[1]));
+    utils::handle_cuda_error(cudaStreamSynchronize(meta.streams[0]));
     meta.d_bin_sizes = meta.d_bins + C.m;
     meta.d_bin_offsets = meta.d_bin_sizes + N_BINS;
     meta.d_max_row_nnz = meta.d_bin_offsets + N_BINS;
     meta.d_total_nnz = meta.d_max_row_nnz + 1;
 
-    utils::handle_cuda_error(cudaStreamSynchronize(meta.streams[0]));
+    utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamDefault));
 }

@@ -56,7 +56,7 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta) {
         for (int i = 1; i < N_BINS; i++)
             meta.h_bin_offsets[i] = C.m;
 
-        utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamPerThread));
+        utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamDefault));
         return;
     }
 
@@ -91,5 +91,5 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta) {
                                              meta.d_bin_sizes,
                                              meta.d_bins);
 
-    utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamPerThread));
+    utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamDefault));
 }
