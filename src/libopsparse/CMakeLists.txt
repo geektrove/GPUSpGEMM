@@ -5,4 +5,4 @@ target_include_directories(libopsparse PRIVATE include/opsparse)
 
 target_link_libraries(libopsparse PUBLIC libutils)
 target_link_libraries(libopsparse PUBLIC CUDA::cusparse)
-target_link_libraries(libopsparse PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(libopsparse PRIVATE OpenMP::OpenMP_CUDA)
