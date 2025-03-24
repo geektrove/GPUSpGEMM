@@ -1,12 +1,13 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 inline constexpr std::int32_t N_BINS = 8;
 
 struct Meta {
     // Host memory
-    cudaStream_t streams[N_BINS]{};
+    std::array<cudaStream_t, N_BINS> streams{};
     std::size_t cub_storage_size{};
 
     // Device memory
