@@ -14,15 +14,17 @@
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 
-__global__ void k_sym_binning1(const std::int32_t* __restrict__ nips,
-                               std::int32_t m,
-                               std::int32_t* __restrict__ bin_sizes);
+__global__ void k_sym_binning1(
+    const __grid_constant__ std::int32_t* const __restrict__ nips,
+    const __grid_constant__ std::int32_t m,
+    __grid_constant__ std::int32_t* const __restrict__ bin_sizes);
 
-__global__ void k_sym_binning2(const std::int32_t* __restrict__ nips,
-                               std::int32_t m,
-                               const std::int32_t* __restrict__ bin_offsets,
-                               std::int32_t* __restrict__ bin_sizes,
-                               std::int32_t* __restrict__ bins);
+__global__ void k_sym_binning2(
+    const __grid_constant__ std::int32_t* const __restrict__ nips,
+    const __grid_constant__ std::int32_t m,
+    const __grid_constant__ std::int32_t* const __restrict__ bin_offsets,
+    __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
+    __grid_constant__ std::int32_t* const __restrict__ bins);
 
 inline constexpr std::int32_t SYM_BIN_RANGES[N_BINS] =
     {26, 426, 853, 1706, 3413, 6826, 10240, INT_MAX};

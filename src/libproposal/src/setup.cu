@@ -9,12 +9,13 @@
 
 namespace cg = cooperative_groups;
 
-__global__ void k_compute_nip(const std::int32_t* __restrict__ a_rpt,
-                              const std::int32_t* __restrict__ a_col,
-                              const std::int32_t* __restrict__ b_rpt,
-                              const std::int32_t m,
-                              std::int32_t* __restrict__ nips,
-                              std::int32_t* __restrict__ max_nip) {
+__global__ void k_compute_nip(
+    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+    const __grid_constant__ std::int32_t* const __restrict__ a_col,
+    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+    const __grid_constant__ std::int32_t m,
+    __grid_constant__ std::int32_t* const __restrict__ nips,
+    __grid_constant__ std::int32_t* const __restrict__ max_nip) {
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     // TODO: Compute optimal block dimensions
