@@ -19,6 +19,7 @@ Checks: >
   -cppcoreguidelines-owning-memory,
   -misc-non-private-member-variables-in-classes,
   -modernize-avoid-c-arrays,
+  -readability-avoid-const-params-in-decls,
   -readability-braces-around-statements,
   -readability-identifier-length,
   -readability-static-accessed-through-instance,
