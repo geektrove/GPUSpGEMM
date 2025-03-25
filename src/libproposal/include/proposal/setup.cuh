@@ -46,6 +46,10 @@ void setup(const utils::DeviceCSR<T>& A,
     const auto d_memsize = (C.m + 2 * N_BINS + 2) * sizeof(std::int32_t)
                            + meta.cub_storage_size;
     utils::handle_cuda_error(cudaMallocAsync(&meta.d_bins, d_memsize, meta.streams[0]));
+    meta.d_bin_sizes = meta.d_bins + C.m;
+    meta.d_bin_offsets = meta.d_bin_sizes + N_BINS;
+    meta.d_max_row_nnz = meta.d_bin_offsets + N_BINS;
+    meta.d_total_nnz = meta.d_max_row_nnz + 1;
 
     const auto h_memsize = (2 * N_BINS + 2) * sizeof(std::int32_t);
     utils::handle_cuda_error(cudaMallocHost(&meta.h_bin_sizes, h_memsize));
@@ -59,10 +63,5 @@ void setup(const utils::DeviceCSR<T>& A,
                                              cudaMemcpyDeviceToHost));
 
     utils::handle_cuda_error(cudaStreamSynchronize(meta.streams[0]));
-    meta.d_bin_sizes = meta.d_bins + C.m;
-    meta.d_bin_offsets = meta.d_bin_sizes + N_BINS;
-    meta.d_max_row_nnz = meta.d_bin_offsets + N_BINS;
-    meta.d_total_nnz = meta.d_max_row_nnz + 1;
-
     utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamDefault));
 }
