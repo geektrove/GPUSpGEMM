@@ -8,6 +8,7 @@
 #include "symbolic.cuh"
 #include "Timings.h"
 #include <cuda_profiler_api.h>
+#include <nvtx3/nvtx3.hpp>
 
 void cudaruntime_warmup() {
     int* d;
@@ -60,6 +61,7 @@ long compute_flop(const CSR& A, const CSR& B) {
 
 // setup
 void h_setup(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
+    NVTX3_FUNC_RANGE();
     meta.allocate_rpt(C);          // allocate C.rpt, other init procedure, default stream
     cudaMemset(C.d_rpt + C.M, 0, sizeof(mint));
     h_compute_flop(A, B, C, meta); // compute flop, stream[0]
@@ -68,10 +70,12 @@ void h_setup(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
                            C.d_rpt + C.M,
                            sizeof(mint),
                            cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaDeviceSynchronize());
 }
 
 // symbolic binning
 inline void h_symbolic_binning(CSR& C, Meta& meta) {
+    NVTX3_FUNC_RANGE();
     meta.memset_all(0); // memset d_bin_size
     mint BS = 1024;
     mint GS = div_up(C.M, BS);
@@ -101,9 +105,11 @@ inline void h_symbolic_binning(CSR& C, Meta& meta) {
                                                            meta.d_bin_size,
                                                            meta.d_bin_offset);
     }
+    CHECK_ERROR(cudaDeviceSynchronize());
 }
 
 void h_symbolic(const CSR& A, const CSR& B, CSR& C, Meta& meta) {
+    NVTX3_FUNC_RANGE();
     //double t0, t1;
     if (meta.bin_size[5]) {
         k_symbolic_shared_hash_tb<8192><<<meta.bin_size[5], 1024, 0, meta.stream[5]>>>(
@@ -230,9 +236,11 @@ void h_symbolic(const CSR& A, const CSR& B, CSR& C, Meta& meta) {
     if (meta.bin_size[7] && meta.bin_size[7] + 1 > meta.cub_storage_size / sizeof(mint)) {
         CHECK_ERROR(cudaFree(d_fail_bins));
     }
+    CHECK_ERROR(cudaDeviceSynchronize());
 }
 
 inline void h_numeric_binning(CSR& C, Meta& meta) {
+    NVTX3_FUNC_RANGE();
     meta.memset_all(0);
     mint BS = 1024;
     mint GS = div_up(C.M, BS);
@@ -267,9 +275,11 @@ inline void h_numeric_binning(CSR& C, Meta& meta) {
                                                           meta.d_bin_size,
                                                           meta.d_bin_offset);
     }
+    CHECK_ERROR(cudaDeviceSynchronize());
 }
 
 inline void h_numeric_full_occu(const CSR& A, const CSR& B, CSR& C, Meta& meta) {
+    NVTX3_FUNC_RANGE();
     if (meta.bin_size[6]) {
         CHECK_ERROR(cudaFuncSetAttribute(k_numeric_max_shared_hash_tb_half_occu,
                                          cudaFuncAttributeMaxDynamicSharedMemorySize,
@@ -414,4 +424,5 @@ inline void h_numeric_full_occu(const CSR& A, const CSR& B, CSR& C, Meta& meta) 
     if (meta.global_mem_pool_malloced) {
         CHECK_ERROR(cudaFree(meta.d_global_mem_pool));
     }
+    CHECK_ERROR(cudaDeviceSynchronize());
 }

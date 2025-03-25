@@ -1,6 +1,7 @@
 #include "CSR.h"
 #include "Meta.h"
 #include <cub/cub.cuh>
+#include <nvtx3/nvtx3.hpp>
 
 Meta::Meta(CSR& C) {
     allocate_rpt(C);
@@ -48,6 +49,7 @@ void Meta::allocate(CSR& C) {
 }
 
 void Meta::release() {
+    nvtx3::scoped_range r{"cleanup"};
     cudaFree(d_combined_mem);
     d_combined_mem = nullptr;
     if (stream != nullptr) {
