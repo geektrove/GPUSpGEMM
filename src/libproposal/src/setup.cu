@@ -34,6 +34,6 @@ __global__ void k_compute_nip(
         return row_nip;
     });
 
-    const auto s_max_nip = cg::reduce(tile, l_max_nip, cg::greater<std::int32_t>{});
-    cg::invoke_one(block, [&] { atomicMax(max_nip, s_max_nip); });
+    cuda::atomic_ref<std::int32_t, cuda::thread_scope_device> max_nip_ref{*max_nip};
+    cg::reduce_update_async(tile, max_nip_ref, l_max_nip, cg::greater<std::int32_t>{});
 }
