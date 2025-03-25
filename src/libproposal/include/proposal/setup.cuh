@@ -54,8 +54,7 @@ void setup(const utils::DeviceCSR<T>& A,
     meta.d_max_row_nnz = meta.d_bin_offsets + N_BINS;
     meta.d_total_nnz = meta.d_max_row_nnz + 1;
 
-    const auto h_memsize = (2 * N_BINS + 2) * sizeof(std::int32_t);
-    utils::handle_cuda_error(cudaMallocHost(&meta.h_bin_sizes, h_memsize));
+    meta.h_bin_sizes = new std::int32_t[2 * N_BINS + 2];
     meta.h_bin_offsets = meta.h_bin_sizes + N_BINS;
     meta.h_max_row_nnz = meta.h_bin_offsets + N_BINS;
     meta.h_total_nnz = meta.h_max_row_nnz + 1;

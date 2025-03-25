@@ -12,7 +12,7 @@ inline auto cleanup(Meta& meta) -> void {
     SPDLOG_DEBUG("Free device memory asynchronously");
     utils::handle_cuda_error(cudaFreeAsync(meta.d_bins, cudaStreamDefault));
     SPDLOG_DEBUG("Free host memory");
-    utils::handle_cuda_error(cudaFreeHost(meta.h_bin_sizes));
+    delete[] meta.h_bin_sizes;
     SPDLOG_DEBUG("Destroy streams");
     for (auto& stream : meta.streams)
         utils::handle_cuda_error(cudaStreamDestroy(stream));
