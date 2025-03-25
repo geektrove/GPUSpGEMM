@@ -5,6 +5,7 @@
 
 #include <cub/cub.cuh>
 #include <cuda/cmath>
+#include <nvtx3/nvtx3.hpp>
 
 #include <utils/utils.cuh>
 
@@ -23,6 +24,8 @@ void setup(const utils::DeviceCSR<T>& A,
            const utils::DeviceCSR<T>& B,
            utils::DeviceCSR<T>& C,
            Meta& meta) {
+    NVTX3_FUNC_RANGE();
+
     C.m = A.m;
     C.n = B.n;
 

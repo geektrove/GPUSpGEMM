@@ -29,8 +29,14 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/google/benchmark.git
     GIT_TAG v1.9.1
     SYSTEM)
+FetchContent_Declare(
+    nvtx3
+    GIT_REPOSITORY https://github.com/NVIDIA/NVTX.git
+    GIT_TAG v3.1.1
+    SOURCE_SUBDIR c/ SYSTEM)
 
 FetchContent_MakeAvailable(gsl-lite)
 FetchContent_MakeAvailable(fmt)
 FetchContent_MakeAvailable(benchmark)
 FetchContent_MakeAvailable(spdlog)
+FetchContent_MakeAvailable(nvtx3)

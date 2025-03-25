@@ -2,6 +2,7 @@
 #include <thread>
 
 #include <fmt/base.h>
+#include <nvtx3/nvtx3.hpp>
 #include <spdlog/cfg/env.h>
 
 #include <proposal/proposal.cuh>
@@ -14,6 +15,9 @@ auto main(int argc, char** argv) -> int {
 
     // Initialize logging
     spdlog::cfg::load_env_levels();
+
+    // Initialize NVTX
+    nvtxInitialize(nullptr);
 
     // Load the matrices
     if (argc != 4) {

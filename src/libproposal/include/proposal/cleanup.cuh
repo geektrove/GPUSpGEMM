@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 
 #include <utils/utils.cuh>
@@ -7,6 +8,7 @@
 #include <proposal/meta.cuh>
 
 inline auto cleanup(Meta& meta) -> void {
+    NVTX3_FUNC_RANGE();
     SPDLOG_DEBUG("Free device memory asynchronously");
     utils::handle_cuda_error(cudaFreeAsync(meta.d_bins, cudaStreamDefault));
     utils::handle_cuda_error(cudaDeviceSynchronize());

@@ -3,6 +3,7 @@
 #include <concepts>
 #include <cstdlib>
 
+#include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 
 #include <utils/utils.cuh>
@@ -15,6 +16,8 @@
 template<std::floating_point T>
 auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     -> utils::DeviceCSR<T> {
+    NVTX3_FUNC_RANGE();
+
     Meta meta;
     utils::DeviceCSR<T> C;
 

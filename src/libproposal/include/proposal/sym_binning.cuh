@@ -7,6 +7,7 @@
 
 #include <cooperative_groups.h>
 #include <cub/cub.cuh>
+#include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 
 #include <utils/utils.cuh>
@@ -31,6 +32,8 @@ inline constexpr std::int32_t SYM_BIN_RANGES[N_BINS] =
 
 template<std::floating_point T>
 void sym_binning(utils::DeviceCSR<T>& C, Meta& meta) {
+    NVTX3_FUNC_RANGE();
+
     if (*meta.h_max_row_nnz <= SYM_BIN_RANGES[0]) {
         // If all rows fall into the smallest bin, we can skip the binning process
         // and directly assign the row indices to the smallest bin
