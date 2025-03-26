@@ -8,6 +8,7 @@
 #include <proposal/proposal.cuh>
 #include <utils/utils.cuh>
 
+constexpr int WARMUP_ITERATIONS = 10;
 constexpr auto SLEEP_TIME = std::chrono::milliseconds(100);
 
 auto main(int argc, char** argv) -> int {
@@ -33,10 +34,12 @@ auto main(int argc, char** argv) -> int {
     const auto d_a = h_a.to<utils::Location::Device>();
     const auto d_b = h_b.to<utils::Location::Device>();
 
-    // Warm up the GPU
-    proposal(d_a, d_b);
-    utils::handle_cuda_error(cudaDeviceSynchronize());
-    std::this_thread::sleep_for(SLEEP_TIME);
+    // Warmup
+    for (int i = 0; i < WARMUP_ITERATIONS; i++) {
+        auto c = proposal(d_a, d_b);
+        utils::device_sync();
+        std::this_thread::sleep_for(SLEEP_TIME);
+    }
 
     // Execute
     const auto d_c = proposal(d_a, d_b);

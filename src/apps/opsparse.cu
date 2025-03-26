@@ -9,6 +9,7 @@
 #include <opsparse/opsparse.h>
 #include <utils/utils.cuh>
 
+constexpr int WARMUP_ITERATIONS = 10;
 constexpr auto SLEEP_TIME = std::chrono::milliseconds(100);
 
 auto main(int argc, char** argv) -> int {
@@ -40,15 +41,15 @@ auto main(int argc, char** argv) -> int {
     A.H2D();
     B.H2D();
 
-    // Warm up the GPU
-    {
+    // Warmup
+    for (int i = 0; i < WARMUP_ITERATIONS; i++) {
         CSR C;
         Meta meta;
         Timings timing;
         opsparse(A, B, C, meta, timing);
+        utils::device_sync();
+        std::this_thread::sleep_for(SLEEP_TIME);
     }
-    utils::handle_cuda_error(cudaDeviceSynchronize());
-    std::this_thread::sleep_for(SLEEP_TIME);
 
     // Execute
     CSR C;
