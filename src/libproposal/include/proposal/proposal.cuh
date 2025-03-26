@@ -18,8 +18,8 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     -> utils::DeviceCSR<T> {
     NVTX3_FUNC_RANGE();
 
-    Meta meta;
     utils::DeviceCSR<T> C;
+    Meta meta;
 
     // Get device properties
 
