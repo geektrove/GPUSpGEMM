@@ -8,13 +8,9 @@
 #include <gsl/gsl-lite.hpp>
 
 #include <utils/errors.cuh>
+#include <utils/location.cuh>
 
 namespace utils {
-
-enum class Location : std::uint8_t {
-    Host,
-    Device,
-};
 
 template<std::floating_point T, Location L>
 struct CSR {
