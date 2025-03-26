@@ -10,11 +10,11 @@
 inline auto cleanup(Meta& meta) -> void {
     NVTX3_FUNC_RANGE();
     SPDLOG_DEBUG("Free device memory asynchronously");
-    utils::handle_cuda_error(cudaFreeAsync(meta.d_bins, cudaStreamDefault));
+    utils::free_async(meta.d_bins);
     SPDLOG_DEBUG("Free host memory");
-    delete[] meta.h_bin_sizes;
+    utils::free<utils::Location::Host>(meta.h_bin_sizes);
     SPDLOG_DEBUG("Destroy streams");
     for (auto& stream : meta.streams)
         utils::handle_cuda_error(cudaStreamDestroy(stream));
-    utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamDefault));
+    utils::stream_sync();
 }

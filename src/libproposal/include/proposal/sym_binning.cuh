@@ -62,36 +62,32 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta) {
         for (int i = 1; i < N_BINS; i++)
             meta.h_bin_offsets[i] = C.m;
 
-        utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamDefault));
+        utils::stream_sync();
         return;
     }
 
     // Perform full two-stage symbolic binning
     SPDLOG_DEBUG("Performing symbolic binning full, max nip is {}", *meta.h_max_row_nnz);
 
-    utils::handle_cuda_error(
-        cudaMemsetAsync(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t)));
+    utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t));
 
     // TODO: Compute optimal grid dimensions
     static constexpr auto BLOCK_SIZE = 1024;
     const auto n_blocks = cuda::ceil_div(C.m, BLOCK_SIZE);
     k_sym_binning1<<<n_blocks, BLOCK_SIZE>>>(C.rpt, C.m, meta.d_bin_sizes);
 
-    utils::handle_cuda_error(cudaMemcpyAsync(meta.h_bin_sizes,
-                                             meta.d_bin_sizes,
-                                             N_BINS * sizeof(std::int32_t),
-                                             cudaMemcpyDeviceToHost));
-    utils::handle_cuda_error(
-        cudaMemsetAsync(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t)));
+    utils::memcpy_async(meta.h_bin_sizes,
+                        meta.d_bin_sizes,
+                        N_BINS * sizeof(std::int32_t));
+    utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t));
 
     meta.h_bin_offsets[0] = 0;
     for (int i = 0; i + 1 < N_BINS; i++)
         meta.h_bin_offsets[i + 1] = meta.h_bin_offsets[i] + meta.h_bin_sizes[i];
 
-    utils::handle_cuda_error(cudaMemcpyAsync(meta.d_bin_offsets,
-                                             meta.h_bin_offsets,
-                                             N_BINS * sizeof(std::int32_t),
-                                             cudaMemcpyHostToDevice));
+    utils::memcpy_async(meta.d_bin_offsets,
+                        meta.h_bin_offsets,
+                        N_BINS * sizeof(std::int32_t));
 
     k_sym_binning2<<<n_blocks, BLOCK_SIZE>>>(C.rpt,
                                              C.m,
@@ -99,5 +95,5 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta) {
                                              meta.d_bin_sizes,
                                              meta.d_bins);
 
-    utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamDefault));
+    utils::stream_sync();
 }

@@ -28,10 +28,9 @@ void setup(const utils::DeviceCSR<T>& A,
 
     C.m = A.m;
     C.n = B.n;
-
-    utils::handle_cuda_error(
-        cudaMallocAsync(&C.rpt, (C.m + 1) * sizeof(std::int32_t), cudaStreamDefault));
-    utils::handle_cuda_error(cudaMemsetAsync(C.rpt + C.m, 0, sizeof(std::int32_t)));
+    auto* rpt = utils::malloc_async((C.m + 1) * sizeof(std::int32_t));
+    C.rpt = static_cast<std::int32_t*>(rpt);
+    utils::memset_async(C.rpt + C.m, 0, sizeof(std::int32_t));
 
     // TODO: Compute optimal grid dimensions
     static constexpr auto BLOCK_SIZE = 1024;
@@ -48,22 +47,22 @@ void setup(const utils::DeviceCSR<T>& A,
                                   C.m + 1);
     const auto d_memsize = (C.m + 2 * N_BINS + 2) * sizeof(std::int32_t)
                            + meta.cub_storage_size;
-    utils::handle_cuda_error(cudaMallocAsync(&meta.d_bins, d_memsize, meta.streams[0]));
+    auto* d_ptr = utils::malloc_async(d_memsize, meta.streams[0]);
+    meta.d_bins = static_cast<std::int32_t*>(d_ptr);
     meta.d_bin_sizes = meta.d_bins + C.m;
     meta.d_bin_offsets = meta.d_bin_sizes + N_BINS;
     meta.d_max_row_nnz = meta.d_bin_offsets + N_BINS;
     meta.d_total_nnz = meta.d_max_row_nnz + 1;
 
-    meta.h_bin_sizes = new std::int32_t[2 * N_BINS + 2];
+    auto* h_ptr = utils::malloc<utils::Location::Host>((2 * N_BINS + 2)
+                                                       * sizeof(std::int32_t));
+    meta.h_bin_sizes = static_cast<std::int32_t*>(h_ptr);
     meta.h_bin_offsets = meta.h_bin_sizes + N_BINS;
     meta.h_max_row_nnz = meta.h_bin_offsets + N_BINS;
     meta.h_total_nnz = meta.h_max_row_nnz + 1;
 
-    utils::handle_cuda_error(cudaMemcpyAsync(meta.h_max_row_nnz,
-                                             C.rpt + C.m,
-                                             sizeof(std::int32_t),
-                                             cudaMemcpyDeviceToHost));
+    utils::memcpy_async(meta.h_max_row_nnz, C.rpt + C.m, sizeof(std::int32_t));
 
-    utils::handle_cuda_error(cudaStreamSynchronize(meta.streams[0]));
-    utils::handle_cuda_error(cudaStreamSynchronize(cudaStreamDefault));
+    utils::stream_sync(meta.streams[0]);
+    utils::stream_sync();
 }
