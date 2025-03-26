@@ -9,6 +9,7 @@
 
 #include <utils/errors.cuh>
 #include <utils/location.cuh>
+#include <utils/runtime.cuh>
 
 namespace utils {
 
@@ -42,16 +43,6 @@ struct CSR {
     friend auto swap(CSR<T_, L_>&, CSR<T_, L_>&) noexcept -> void;
 
     auto release() -> void;
-
-    static auto allocate(std::int32_t count, std::size_t size) -> void*;
-
-    static auto free(void* ptr) -> void;
-
-    static auto copy(void* dst,
-                     const void* src,
-                     std::int32_t count,
-                     std::size_t size,
-                     cudaMemcpyKind kind) -> void;
 };
 
 template<std::floating_point T, Location L>
@@ -59,24 +50,21 @@ CSR<T, L>::CSR(const std::int32_t nnz_, const std::int32_t m_, const std::int32_
     : nnz{nnz_},
       m{m_},
       n{n_},
-      rpt{static_cast<std::int32_t*>(allocate(m + 1, sizeof(std::int32_t)))},
-      col{static_cast<std::int32_t*>(allocate(nnz, sizeof(std::int32_t)))},
-      val{static_cast<T*>(allocate(nnz, sizeof(T)))} {}
+      rpt{static_cast<std::int32_t*>(malloc<L>((m + 1) * sizeof(std::int32_t)))},
+      col{static_cast<std::int32_t*>(malloc<L>(nnz * sizeof(std::int32_t)))},
+      val{static_cast<T*>(malloc<L>(nnz * sizeof(T)))} {}
 
 template<std::floating_point T, Location L>
 CSR<T, L>::CSR(const CSR& other)
     : nnz{other.nnz},
       m{other.m},
       n{other.n},
-      rpt{static_cast<std::int32_t*>(allocate(m + 1, sizeof(std::int32_t)))},
-      col{static_cast<std::int32_t*>(allocate(nnz, sizeof(std::int32_t)))},
-      val{static_cast<T*>(allocate(nnz, sizeof(T)))} {
-    const auto direction = (L == Location::Host) ? cudaMemcpyHostToHost
-                                                 : cudaMemcpyDeviceToDevice;
-
-    copy(rpt, other.rpt, m + 1, sizeof(std::int32_t), direction);
-    copy(col, other.col, nnz, sizeof(std::int32_t), direction);
-    copy(val, other.val, nnz, sizeof(T), direction);
+      rpt{static_cast<std::int32_t*>(malloc<L>((m + 1) * sizeof(std::int32_t)))},
+      col{static_cast<std::int32_t*>(malloc<L>(nnz * sizeof(std::int32_t)))},
+      val{static_cast<T*>(malloc<L>(nnz * sizeof(T)))} {
+    memcpy(rpt, other.rpt, (m + 1) * sizeof(std::int32_t));
+    memcpy(col, other.col, nnz * sizeof(std::int32_t));
+    memcpy(val, other.val, nnz * sizeof(T));
 }
 
 template<std::floating_point T, Location L>
@@ -175,14 +163,9 @@ auto CSR<T, L>::to() const -> CSR<T, To> {
     static_assert(To != L, "Cannot convert to the same location");
 
     CSR<T, To> to(nnz, m, n);
-
-    const auto direction = (To == Location::Device) ? cudaMemcpyHostToDevice
-                                                    : cudaMemcpyDeviceToHost;
-
-    copy(to.rpt, rpt, m + 1, sizeof(std::int32_t), direction);
-    copy(to.col, col, nnz, sizeof(std::int32_t), direction);
-    copy(to.val, val, nnz, sizeof(T), direction);
-
+    memcpy(to.rpt, rpt, (m + 1) * sizeof(std::int32_t));
+    memcpy(to.col, col, nnz * sizeof(std::int32_t));
+    memcpy(to.val, val, nnz * sizeof(T));
     return to;
 }
 
@@ -201,44 +184,15 @@ inline auto swap(CSR<T, L>& lhs, CSR<T, L>& rhs) noexcept -> void {
 
 template<std::floating_point T, Location L>
 auto CSR<T, L>::release() -> void {
-    free(rpt);
-    free(col);
-    free(val);
+    free<L>(rpt);
+    free<L>(col);
+    free<L>(val);
     nnz = 0;
     m = 0;
     n = 0;
     rpt = nullptr;
     col = nullptr;
     val = nullptr;
-}
-
-template<std::floating_point T, Location L>
-auto CSR<T, L>::allocate(std::int32_t count, std::size_t size) -> void* {
-    void* ptr{};
-    if constexpr (L == Location::Host) {
-        handle_cuda_error(cudaMallocHost(&ptr, count * size));
-    } else {
-        handle_cuda_error(cudaMalloc(&ptr, count * size));
-    }
-    return ptr;
-}
-
-template<std::floating_point T, Location L>
-auto CSR<T, L>::free(void* ptr) -> void {
-    if constexpr (L == Location::Host) {
-        handle_cuda_error(cudaFreeHost(ptr));
-    } else {
-        handle_cuda_error(cudaFree(ptr));
-    }
-}
-
-template<std::floating_point T, Location L>
-auto CSR<T, L>::copy(void* dst,
-                     const void* src,
-                     std::int32_t count,
-                     std::size_t size,
-                     cudaMemcpyKind kind) -> void {
-    handle_cuda_error(cudaMemcpy(dst, src, count * size, kind));
 }
 
 template<std::floating_point T>

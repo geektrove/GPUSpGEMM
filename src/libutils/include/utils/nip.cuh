@@ -4,6 +4,7 @@
 
 #include <utils/csr.cuh>
 #include <utils/errors.cuh>
+#include <utils/runtime.cuh>
 
 namespace utils {
 
@@ -75,8 +76,7 @@ auto get_nip(const CSR<T, Location::Device>& a, const CSR<T, Location::Device>& 
                                                         spgemm_desc,
                                                         &buffer1_size,
                                                         nullptr));
-    void* buffer1{};
-    handle_cuda_error(cudaMalloc(&buffer1, buffer1_size));
+    void* buffer1 = malloc<Location::Device>(buffer1_size);
     handle_cusparse_error(cusparseSpGEMM_workEstimation(handle,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -96,7 +96,7 @@ auto get_nip(const CSR<T, Location::Device>& a, const CSR<T, Location::Device>& 
     handle_cusparse_error(cusparseSpGEMM_getNumProducts(spgemm_desc, &nip));
 
     // Clean up
-    handle_cuda_error(cudaFree(buffer1));
+    free<Location::Device>(buffer1);
     handle_cusparse_error(cusparseSpGEMM_destroyDescr(spgemm_desc));
     handle_cusparse_error(cusparseDestroySpMat(desc_c));
     handle_cusparse_error(cusparseDestroySpMat(desc_b));
