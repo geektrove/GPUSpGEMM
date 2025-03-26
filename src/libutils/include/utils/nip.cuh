@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include <cusparse.h>
 
 #include <utils/csr.cuh>
@@ -9,8 +11,7 @@
 namespace utils {
 
 template<std::floating_point T>
-auto get_nip(const CSR<T, Location::Device>& a, const CSR<T, Location::Device>& b)
-    -> int64_t {
+auto get_nip(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> std::int64_t {
     // Initialize cuSPARSE
     cusparseHandle_t handle{};
     handle_cusparse_error(cusparseCreate(&handle));
@@ -92,7 +93,7 @@ auto get_nip(const CSR<T, Location::Device>& a, const CSR<T, Location::Device>& 
                                                         buffer1));
 
     // Extract the number of intermediate products
-    int64_t nip{};
+    std::int64_t nip{};
     handle_cusparse_error(cusparseSpGEMM_getNumProducts(spgemm_desc, &nip));
 
     // Clean up
