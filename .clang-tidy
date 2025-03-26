@@ -15,6 +15,7 @@ Checks: >
   -cppcoreguidelines-avoid-c-arrays,
   -cppcoreguidelines-avoid-non-const-global-variables,
   -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-no-malloc,
   -cppcoreguidelines-pro-type-reinterpret-cast,
   -cppcoreguidelines-owning-memory,
   -misc-non-private-member-variables-in-classes,
