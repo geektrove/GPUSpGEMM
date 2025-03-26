@@ -77,8 +77,7 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                       &buffer1_size,
                                       nullptr));
     SPDLOG_DEBUG("Buffer 1 size is {}", buffer1_size);
-    void* buffer1{};
-    utils::handle_cuda_error(cudaMalloc(&buffer1, buffer1_size));
+    void* buffer1 = utils::malloc<utils::Location::Device>(buffer1_size);
     utils::handle_cusparse_error(
         cusparseSpGEMM_workEstimation(handle,
                                       CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -110,8 +109,7 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                                         &buffer2_size,
                                                         nullptr));
     SPDLOG_DEBUG("Buffer 2 size is {}", buffer2_size);
-    void* buffer2{};
-    utils::handle_cuda_error(cudaMalloc(&buffer2, buffer2_size));
+    void* buffer2 = utils::malloc<utils::Location::Device>(buffer2_size);
     utils::handle_cusparse_error(cusparseSpGEMM_compute(handle,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -153,8 +151,8 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                                      spgemm_desc));
 
     // Clean up
-    utils::handle_cuda_error(cudaFree(buffer2));
-    utils::handle_cuda_error(cudaFree(buffer1));
+    utils::free<utils::Location::Device>(buffer2);
+    utils::free<utils::Location::Device>(buffer1);
     utils::handle_cusparse_error(cusparseSpGEMM_destroyDescr(spgemm_desc));
     utils::handle_cusparse_error(cusparseDestroy(handle));
     utils::handle_cusparse_error(cusparseDestroySpMat(desc_c));
