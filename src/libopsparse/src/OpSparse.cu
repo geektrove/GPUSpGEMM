@@ -33,7 +33,9 @@ void opsparse(const CSR& A, const CSR& B, CSR& C, Meta& meta, Timings& timing) {
     // numeric binning, exclusive sum, and allocate C
 
     {
+#ifndef NVTX_DISABLE
         nvtx3::scoped_range r{"h-numbinning-scan-allocation"};
+#endif
         meta.memset_all(0);
         mint BS = 1024;
         mint GS = div_up(C.M, BS);

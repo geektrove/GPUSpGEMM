@@ -49,7 +49,9 @@ void Meta::allocate(CSR& C) {
 }
 
 void Meta::release() {
+    #ifndef NVTX_DISABLE
     nvtx3::scoped_range r{"cleanup"};
+    #endif
     cudaFree(d_combined_mem);
     d_combined_mem = nullptr;
     if (stream != nullptr) {
