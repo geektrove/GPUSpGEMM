@@ -23,7 +23,7 @@ void benchmark_proposal(benchmark::State& state,
     for (int i = 0; i < WARMUP_ITERATIONS; i++) {
         std::this_thread::sleep_for(SLEEP_TIME);
         auto c = proposal(a, b);
-        utils::handle_cuda_error(cudaDeviceSynchronize());
+        utils::device_sync();
     }
 
     for (auto _ : state) {
@@ -38,7 +38,7 @@ void benchmark_proposal(benchmark::State& state,
 
         const auto start = std::chrono::high_resolution_clock::now();
         auto c = proposal(a, b);
-        utils::handle_cuda_error(cudaDeviceSynchronize());
+        utils::device_sync();
         const auto end = std::chrono::high_resolution_clock::now();
         const auto seconds = std::chrono::duration<double>(end - start).count();
         state.SetIterationTime(seconds);

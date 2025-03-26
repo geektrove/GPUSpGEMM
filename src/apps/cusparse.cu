@@ -31,7 +31,7 @@ auto main(int argc, char** argv) -> int {
 
     // Warm up the GPU
     cusparse(d_a, d_b);
-    utils::handle_cuda_error(cudaDeviceSynchronize());
+    utils::device_sync();
     std::this_thread::sleep_for(SLEEP_TIME);
 
     // Execute

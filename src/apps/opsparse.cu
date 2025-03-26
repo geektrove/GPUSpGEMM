@@ -55,7 +55,6 @@ auto main(int argc, char** argv) -> int {
     Meta meta;
     Timings timing;
     opsparse(A, B, C, meta, timing);
-    utils::handle_cuda_error(cudaDeviceSynchronize());
 
     // Save the result
     C.D2H();
