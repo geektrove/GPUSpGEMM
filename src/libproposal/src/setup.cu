@@ -22,7 +22,7 @@ __global__ void k_compute_nip(
     const auto tile = cg::tiled_partition<1024>(block);
 
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
-    const auto l_max_nip = cuda::std::invoke([&] {
+    const auto l_nip = cuda::std::invoke([&] {
         if (row >= m)
             return 0;
         std::int32_t row_nip = 0;
@@ -35,5 +35,5 @@ __global__ void k_compute_nip(
     });
 
     cuda::atomic_ref<std::int32_t, cuda::thread_scope_device> max_nip_ref{*max_nip};
-    cg::reduce_update_async(tile, max_nip_ref, l_max_nip, cg::greater<std::int32_t>{});
+    cg::reduce_update_async(tile, max_nip_ref, l_nip, cg::greater<std::int32_t>{});
 }
