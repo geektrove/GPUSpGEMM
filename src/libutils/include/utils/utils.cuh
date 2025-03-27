@@ -3,5 +3,6 @@
 #include <utils/csr.cuh>
 #include <utils/definitions.cuh>
 #include <utils/errors.cuh>
+#include <utils/math.hpp>
 #include <utils/nip.cuh>
 #include <utils/runtime.cuh>
