@@ -12,7 +12,6 @@
 
 #include <utils/utils.cuh>
 
-#include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 
 __global__ void k_sym_binning1(
