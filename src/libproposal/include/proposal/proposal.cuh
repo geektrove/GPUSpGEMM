@@ -11,6 +11,7 @@
 #include <proposal/cleanup.cuh>
 #include <proposal/meta.cuh>
 #include <proposal/setup.cuh>
+#include <proposal/sym.cuh>
 #include <proposal/sym_binning.cuh>
 
 template<std::floating_point T>
@@ -28,6 +29,9 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     // Symbolic binning
     sym_binning(C, meta);
+
+    // Symbolic
+    sym(A, B, C, meta);
 
     // Cleanup
     cleanup(meta);
