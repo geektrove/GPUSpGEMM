@@ -9,6 +9,7 @@ function(add_library_wrapped name visibility)
     else()
         add_library(${name} ${ARGN})
     endif()
+    set_target_properties(${name} PROPERTIES PREFIX "")
     _customize_target_wrapped(${name} ${visibility})
 endfunction()
 
