@@ -79,8 +79,10 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
     utils::memcpy_async(meta.h_bin_sizes,
                         meta.d_bin_sizes,
                         meta.n_bins * sizeof(std::int32_t));
+    utils::event_record(meta.events[0]);
     utils::memset_async(meta.d_bin_sizes, 0, meta.n_bins * sizeof(std::int32_t));
 
+    utils::event_sync(meta.events[0]);
     meta.h_bin_offsets[0] = 0;
     for (int i = 0; i + 1 < meta.n_bins; i++)
         meta.h_bin_offsets[i + 1] = meta.h_bin_offsets[i] + meta.h_bin_sizes[i];
