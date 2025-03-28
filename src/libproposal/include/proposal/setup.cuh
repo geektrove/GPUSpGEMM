@@ -170,6 +170,7 @@ void setup(const utils::DeviceCSR<T>& A,
     meta.d_total_nnz = meta.d_max_row_nnz + 1;
 
     SPDLOG_DEBUG("Allocated memory on device: {}", d_memsize);
+    SPDLOG_DEBUG("-- CUB memory on device: {}", meta.cub_storage_size);
 
     // Allocate host memory
     const auto h_memsize = (5 * meta.n_bins + 2) * sizeof(std::int32_t);
@@ -263,5 +264,5 @@ void setup(const utils::DeviceCSR<T>& A,
     utils::stream_sync(meta.streams[0]);
     utils::stream_sync();
 
-    SPDLOG_DEBUG("Maximum NIP per row in C is {}", *meta.h_max_row_nnz);
+    SPDLOG_DEBUG("Maximum NIP per row is {}", *meta.h_max_row_nnz);
 }
