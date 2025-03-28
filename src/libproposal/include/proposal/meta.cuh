@@ -15,13 +15,13 @@ struct Meta {
 
     // Host memory (combined)
     void* h_ptr{};
-    std::int32_t* sym_block_sizes{};     // size n_bins
-    std::int32_t* sym_bin_table_sizes{}; // size n_bins
-    std::int32_t* h_sym_bin_ranges{};    // size n_bins
-    std::int32_t* h_bin_sizes{};         // size n_bins
-    std::int32_t* h_bin_offsets{};       // size n_bins
-    std::int32_t* h_max_row_nnz{};       // size 1
-    std::int32_t* h_total_nnz{};         // size 1
+    std::int32_t* sym_block_sizes{};  // size n_bins
+    std::int32_t* sym_table_sizes{};  // size n_bins
+    std::int32_t* h_sym_bin_ranges{}; // size n_bins
+    std::int32_t* h_bin_sizes{};      // size n_bins
+    std::int32_t* h_bin_offsets{};    // size n_bins
+    std::int32_t* h_max_row_nnz{};    // size 1
+    std::int32_t* h_total_nnz{};      // size 1
 
     // Device memory (combined)
     void* d_ptr{};
