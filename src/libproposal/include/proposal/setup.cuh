@@ -4,8 +4,11 @@
 #include <concepts>
 #include <cstdint>
 
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
 #include <cub/cub.cuh>
 #include <cuda/cmath>
+#include <cuda/std/functional>
 #include <gsl/gsl-lite.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
@@ -15,13 +18,58 @@
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 
+namespace cg = cooperative_groups;
+
+template<std::int32_t BLOCK_SIZE>
 __global__ void k_compute_nip(
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ a_col,
     const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
     const __grid_constant__ std::int32_t m,
     __grid_constant__ std::int32_t* const __restrict__ nips,
-    __grid_constant__ std::int32_t* const __restrict__ max_nip);
+    __grid_constant__ std::int32_t* const __restrict__ max_nip) {
+    const auto grid = cg::this_grid();
+    const auto block = cg::this_thread_block();
+    const auto tile = cg::tiled_partition<BLOCK_SIZE>(block);
+
+    const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
+    const auto l_nip = cuda::std::invoke([&] {
+        if (row >= m)
+            return 0;
+        std::int32_t row_nip = 0;
+        for (auto j = a_rpt[row]; j < a_rpt[row + 1]; j++) {
+            const auto col = a_col[j];
+            row_nip += b_rpt[col + 1] - b_rpt[col];
+        }
+        nips[row] = row_nip;
+        return row_nip;
+    });
+
+    cuda::atomic_ref<std::int32_t, cuda::thread_scope_device> max_nip_ref{*max_nip};
+    cg::reduce_update_async(tile, max_nip_ref, l_nip, cg::greater<std::int32_t>{});
+}
+
+template<std::floating_point T>
+void h_compute_nip(const utils::DeviceCSR<T>& A,
+                   const utils::DeviceCSR<T>& B,
+                   utils::DeviceCSR<T>& C,
+                   const Device& device) {
+    const auto n_blocks = cuda::ceil_div(C.m, device.optimal_block_size);
+
+    // Realistically only 512 and 1024 block sizes are optimal
+    // starting from compute capability 1.2, but in any other case,
+    // we can use 1024 threads per block as a fallback
+    switch (device.optimal_block_size) {
+    case 512:
+        k_compute_nip<512>
+            <<<n_blocks, 512>>>(A.rpt, A.col, B.rpt, C.m, C.rpt, C.rpt + C.m);
+        break;
+    default:
+        k_compute_nip<1024>
+            <<<n_blocks, 1024>>>(A.rpt, A.col, B.rpt, C.m, C.rpt, C.rpt + C.m);
+        break;
+    }
+}
 
 template<std::floating_point T>
 void setup(const utils::DeviceCSR<T>& A,
@@ -75,13 +123,7 @@ void setup(const utils::DeviceCSR<T>& A,
     SPDLOG_DEBUG("Optimal block size: {}", device.optimal_block_size);
 
     // Compute NIP per row in C
-    k_compute_nip<<<cuda::ceil_div(C.m, device.optimal_block_size),
-                    device.optimal_block_size>>>(A.rpt,
-                                                 A.col,
-                                                 B.rpt,
-                                                 C.m,
-                                                 C.rpt,
-                                                 C.rpt + C.m);
+    h_compute_nip(A, B, C, device);
 
     // Calculate number of bins
     meta.n_bins = 2; // First bin (PWARP) and last bin (max SMEM) are always present
