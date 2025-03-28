@@ -180,6 +180,6 @@ void sym(const utils::DeviceCSR<T>& A,
             C.rpt);
     }
 
-    for (const auto& stream : meta.streams)
-        utils::stream_sync(stream);
+    for (std::int32_t i = 0; i < meta.n_bins; i++)
+        utils::stream_sync(meta.streams[i]);
 }
