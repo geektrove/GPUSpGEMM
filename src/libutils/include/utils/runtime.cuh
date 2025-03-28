@@ -88,10 +88,8 @@ void launch_kernel(Kernel kernel,
                    std::int32_t block,
                    std::int32_t smem,
                    cudaStream_t stream,
-                   const Args&... args) {
-    void* arg_ptrs[] = {(void*) &args...};
-    handle_cuda_error(
-        cudaLaunchKernel((void*) kernel, grid, block, arg_ptrs, smem, stream));
+                   Args&&... args) {
+    kernel<<<grid, block, smem, stream>>>(std::forward<Args>(args)...);
 }
 
 } // namespace utils
