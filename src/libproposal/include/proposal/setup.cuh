@@ -251,6 +251,11 @@ void setup(const utils::DeviceCSR<T>& A,
                         meta.n_bins * sizeof(std::int32_t),
                         meta.streams[0]);
 
+    // Create CUDA events
+    for (auto& event : meta.events)
+        utils::handle_cuda_error(
+            cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+
     // Synchronize streams
     utils::stream_sync(meta.streams[0]);
     utils::stream_sync();
