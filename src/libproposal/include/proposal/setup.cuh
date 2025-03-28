@@ -166,7 +166,7 @@ void setup(const utils::DeviceCSR<T>& A,
     auto* streams_ptr = utils::malloc<utils::Location::Host>(meta.n_bins
                                                              * sizeof(cudaStream_t));
     meta.streams = static_cast<cudaStream_t*>(streams_ptr);
-    for (auto i = 0; i < meta.n_bins; i++)
+    for (std::int32_t i = 0; i < meta.n_bins; i++)
         utils::handle_cuda_error(cudaStreamCreate(&meta.streams[i]));
 
     // Allocate device memory

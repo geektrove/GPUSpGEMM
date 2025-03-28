@@ -14,7 +14,7 @@ inline auto cleanup(Meta& meta) -> void {
     SPDLOG_DEBUG("Free host memory");
     utils::free<utils::Location::Host>(meta.h_ptr);
     SPDLOG_DEBUG("Destroy streams");
-    for (auto i = 0; i < meta.n_bins; i++)
+    for (std::int32_t i = 0; i < meta.n_bins; i++)
         utils::handle_cuda_error(cudaStreamDestroy(meta.streams[i]));
     utils::free<utils::Location::Host>(static_cast<void*>(meta.streams));
     SPDLOG_DEBUG("Destroy events");
