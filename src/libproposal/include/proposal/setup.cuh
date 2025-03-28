@@ -172,7 +172,7 @@ void setup(const utils::DeviceCSR<T>& A,
     SPDLOG_DEBUG("Allocated memory on device: {}", d_memsize);
 
     // Allocate host memory
-    const auto h_memsize = (4 * meta.n_bins + 2) * sizeof(std::int32_t);
+    const auto h_memsize = (5 * meta.n_bins + 2) * sizeof(std::int32_t);
     meta.h_ptr = utils::malloc<utils::Location::Host>(h_memsize);
     meta.sym_block_sizes = static_cast<std::int32_t*>(meta.h_ptr);
     meta.sym_bin_table_sizes = meta.sym_block_sizes + meta.n_bins;
