@@ -65,8 +65,17 @@ auto free_async(void* ptr, cudaStream_t stream = cudaStreamDefault) -> void {
     handle_cuda_error(cudaFreeAsync(ptr, stream));
 }
 
+inline auto event_record(cudaEvent_t event, cudaStream_t stream = cudaStreamDefault)
+    -> void {
+    handle_cuda_error(cudaEventRecord(event, stream));
+}
+
 inline auto stream_sync(cudaStream_t stream = cudaStreamDefault) -> void {
     handle_cuda_error(cudaStreamSynchronize(stream));
+}
+
+inline auto event_sync(cudaEvent_t event) -> void {
+    handle_cuda_error(cudaEventSynchronize(event));
 }
 
 inline auto device_sync() -> void {
