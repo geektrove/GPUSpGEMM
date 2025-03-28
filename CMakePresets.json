@@ -30,7 +30,8 @@
         "base"
       ],
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CUDA_FLAGS": "-lineinfo"
       }
     },
     {
