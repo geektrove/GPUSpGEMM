@@ -68,13 +68,16 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
     // Perform full two-stage symbolic binning
     utils::memset_async(meta.d_bin_sizes, 0, meta.n_bins * sizeof(std::int32_t));
 
-    const auto n_blocks = cuda::ceil_div(C.m, device.optimal_block_size);
-    auto smem = meta.n_bins * sizeof(std::int32_t);
-    k_sym_binning1<<<n_blocks, device.optimal_block_size, smem>>>(meta.d_sym_bin_ranges,
-                                                                  meta.n_bins,
-                                                                  C.rpt,
-                                                                  C.m,
-                                                                  meta.d_bin_sizes);
+    utils::launch_kernel(k_sym_binning1,
+                         cuda::ceil_div(C.m, device.optimal_block_size),
+                         device.optimal_block_size,
+                         meta.n_bins * sizeof(std::int32_t),
+                         cudaStreamDefault,
+                         meta.d_sym_bin_ranges,
+                         meta.n_bins,
+                         C.rpt,
+                         C.m,
+                         meta.d_bin_sizes);
 
     utils::memcpy_async(meta.h_bin_sizes,
                         meta.d_bin_sizes,
@@ -91,14 +94,18 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
                         meta.h_bin_offsets,
                         meta.n_bins * sizeof(std::int32_t));
 
-    smem = 2 * meta.n_bins * sizeof(std::int32_t);
-    k_sym_binning2<<<n_blocks, device.optimal_block_size, smem>>>(meta.d_sym_bin_ranges,
-                                                                  meta.n_bins,
-                                                                  C.rpt,
-                                                                  C.m,
-                                                                  meta.d_bin_offsets,
-                                                                  meta.d_bin_sizes,
-                                                                  meta.d_bins);
+    utils::launch_kernel(k_sym_binning2,
+                         cuda::ceil_div(C.m, device.optimal_block_size),
+                         device.optimal_block_size,
+                         2 * meta.n_bins * sizeof(std::int32_t),
+                         cudaStreamDefault,
+                         meta.d_sym_bin_ranges,
+                         meta.n_bins,
+                         C.rpt,
+                         C.m,
+                         meta.d_bin_offsets,
+                         meta.d_bin_sizes,
+                         meta.d_bins);
 
     utils::stream_sync();
 }
