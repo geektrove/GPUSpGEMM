@@ -57,19 +57,35 @@ void h_compute_nip(const utils::DeviceCSR<T>& A,
     static constexpr std::int32_t BLOCK512 = 512;
     static constexpr std::int32_t BLOCK1024 = 1024;
 
-    const auto n_blocks = cuda::ceil_div(C.m, device.optimal_block_size);
-
     // Realistically only 512 and 1024 block sizes are optimal
     // starting from compute capability 1.2, but in any other case,
     // we can use 1024 threads per block as a fallback
     switch (device.optimal_block_size) {
     case BLOCK512:
-        k_compute_nip<BLOCK512>
-            <<<n_blocks, BLOCK512>>>(A.rpt, A.col, B.rpt, C.m, C.rpt, C.rpt + C.m);
+        utils::launch_kernel(k_compute_nip<BLOCK512>,
+                             cuda::ceil_div(C.m, BLOCK512),
+                             BLOCK512,
+                             0,
+                             cudaStreamDefault,
+                             A.rpt,
+                             A.col,
+                             B.rpt,
+                             C.m,
+                             C.rpt,
+                             C.rpt + C.m);
         break;
     default:
-        k_compute_nip<BLOCK1024>
-            <<<n_blocks, BLOCK1024>>>(A.rpt, A.col, B.rpt, C.m, C.rpt, C.rpt + C.m);
+        utils::launch_kernel(k_compute_nip<BLOCK1024>,
+                             cuda::ceil_div(C.m, BLOCK1024),
+                             BLOCK1024,
+                             0,
+                             cudaStreamDefault,
+                             A.rpt,
+                             A.col,
+                             B.rpt,
+                             C.m,
+                             C.rpt,
+                             C.rpt + C.m);
         break;
     }
 }
