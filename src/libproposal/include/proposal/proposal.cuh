@@ -9,6 +9,7 @@
 #include <utils/utils.cuh>
 
 #include <proposal/cleanup.cuh>
+#include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 #include <proposal/setup.cuh>
 #include <proposal/sym.cuh>
@@ -21,14 +22,13 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     utils::DeviceCSR<T> C;
     Meta meta;
-
-    // Get device properties
+    Device device;
 
     // Setup
-    setup(A, B, C, meta);
+    setup(A, B, C, meta, device);
 
     // Symbolic binning
-    sym_binning(C, meta);
+    sym_binning(C, meta, device);
 
     // Symbolic
     sym(A, B, C, meta);
