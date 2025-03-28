@@ -32,9 +32,9 @@ function(_customize_target_wrapped name visibility)
     target_compile_definitions(
         ${name}
         ${visibility}
-        $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_WARN>
-        $<$<CONFIG:Debug,RelWithDebInfo>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>
-    )
+        $<$<CONFIG:Release>:NVTX_DISABLE>
+        $<$<CONFIG:Release,RelWithDebInfo>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_WARN>
+        $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>)
 
     target_link_libraries(${name} ${visibility} gsl-lite)
     target_link_libraries(${name} ${visibility} fmt::fmt)
