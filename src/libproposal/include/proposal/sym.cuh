@@ -19,7 +19,6 @@
 
 namespace cg = cooperative_groups;
 
-inline constexpr std::int32_t PWARP = 4;
 inline constexpr std::int32_t PWARP_BLOCK_SIZE = 512;
 inline constexpr auto PWARP_ROWS = PWARP_BLOCK_SIZE / PWARP;
 inline constexpr std::int32_t HASH_SCALE = 107;
