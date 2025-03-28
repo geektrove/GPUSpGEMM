@@ -31,7 +31,7 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     sym_binning(C, meta, device);
 
     // Symbolic
-    sym(A, B, C, meta);
+    sym(A, B, C, meta, device);
 
     // Cleanup
     cleanup(meta);

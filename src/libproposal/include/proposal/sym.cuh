@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 
@@ -9,18 +10,18 @@
 #include <cooperative_groups/reduce.h>
 #include <cub/cub.cuh>
 #include <cuda/atomic>
+#include <cuda/std/bit>
 #include <gsl/gsl-lite.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 
 #include <utils/utils.cuh>
 
+#include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 
 namespace cg = cooperative_groups;
 
-inline constexpr std::int32_t PWARP_BLOCK_SIZE = 512;
-inline constexpr auto PWARP_ROWS = PWARP_BLOCK_SIZE / PWARP;
 inline constexpr std::int32_t HASH_SCALE = 107;
 
 __forceinline__ __device__ auto insert_to_table(std::int32_t* const __restrict__ table,
@@ -68,8 +69,8 @@ __forceinline__ __device__ auto fill_table(const std::int32_t* const __restrict_
     }
 }
 
-template<std::int32_t TABLE_SIZE>
 __global__ void k_sym_shmem_pwarp(
+    const __grid_constant__ std::int32_t table_size,
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ a_col,
     const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
@@ -77,24 +78,31 @@ __global__ void k_sym_shmem_pwarp(
     const __grid_constant__ std::int32_t* const __restrict__ bins,
     const __grid_constant__ std::int32_t bin_size,
     __grid_constant__ std::int32_t* const __restrict__ nnzs) {
-    __shared__ std::int32_t s_tables[PWARP_ROWS * TABLE_SIZE];
-    __shared__ std::int32_t s_nnzs[PWARP_ROWS];
+    extern __shared__ std::int32_t smem[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
+    const auto& tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
+    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
-    for (auto i = block.thread_rank(); i < PWARP_ROWS * TABLE_SIZE;
-         i += block.num_threads())
+    const auto rows_per_block = block_size / PWARP;
+    const auto total_table_size = table_size * rows_per_block;
+
+    auto* s_tables = smem;
+    auto* s_nnzs = smem + total_table_size;
+
+    for (auto i = tib; i < total_table_size; i += block_size)
         s_tables[i] = -1;
-    if (block.thread_rank() % PWARP == 0)
-        s_nnzs[block.thread_rank() / PWARP] = 0;
-    const auto row_id = gsl::narrow_cast<std::int32_t>(grid.thread_rank() / PWARP);
+    if (tib % PWARP == 0)
+        s_nnzs[tib / PWARP] = 0;
+    const auto row_id = tig / PWARP;
     if (row_id >= bin_size)
         return;
     block.sync();
 
-    auto* s_table = s_tables + (block.thread_rank() / PWARP) * TABLE_SIZE;
-    auto* s_nnz = s_nnzs + (block.thread_rank() / PWARP);
+    auto* s_table = s_tables + (static_cast<ptrdiff_t>((tib / PWARP) * table_size));
+    auto* s_nnz = s_nnzs + (tib / PWARP);
     const auto row = bins[row_id];
     fill_table(a_rpt,
                a_col,
@@ -102,10 +110,10 @@ __global__ void k_sym_shmem_pwarp(
                b_col,
                PWARP,
                1,
-               block.thread_rank(),
+               tib,
                row,
                s_table,
-               TABLE_SIZE,
+               table_size,
                s_nnz);
     block.sync();
 
@@ -113,22 +121,24 @@ __global__ void k_sym_shmem_pwarp(
         nnzs[row] = *s_nnz;
 }
 
-template<std::int32_t TABLE_SIZE>
 __global__ void k_sym_shmem(
+    const __grid_constant__ std::int32_t table_size,
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ a_col,
     const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ b_col,
     const __grid_constant__ std::int32_t* const __restrict__ bins,
     __grid_constant__ std::int32_t* const __restrict__ nnzs) {
-    __shared__ std::int32_t s_table[TABLE_SIZE];
+    extern __shared__ std::int32_t s_table[];
     __shared__ std::int32_t s_nnz;
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto warp = cg::tiled_partition<32>(block);
+    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
-    for (auto i = block.thread_rank(); i < TABLE_SIZE; i += block.num_threads())
+    for (auto i = tib; i < table_size; i += block_size)
         s_table[i] = -1;
     cg::invoke_one(block, [&] { s_nnz = 0; });
     block.sync();
@@ -138,12 +148,12 @@ __global__ void k_sym_shmem(
                a_col,
                b_rpt,
                b_col,
-               block.num_threads(),
+               block_size,
                warp.num_threads(),
-               block.thread_rank(),
+               tib,
                row,
                s_table,
-               TABLE_SIZE,
+               table_size,
                &s_nnz);
     block.sync();
 
@@ -154,30 +164,50 @@ template<std::floating_point T>
 void sym(const utils::DeviceCSR<T>& A,
          const utils::DeviceCSR<T>& B,
          utils::DeviceCSR<T>& C,
-         Meta& meta) {
+         Meta& meta,
+         const Device& device) {
     NVTX3_FUNC_RANGE();
 
-    if (meta.h_bin_sizes[5] > 0) {
-        SPDLOG_DEBUG("Sym: bin 5 size is {}", meta.h_bin_sizes[5]);
-        k_sym_shmem<8192><<<meta.h_bin_sizes[5], 1024, 0, meta.streams[5]>>>(
-            A.rpt,
-            A.col,
-            B.rpt,
-            B.col,
-            meta.d_bins + meta.h_bin_offsets[5],
-            C.rpt);
+    static constexpr auto IdxByteSize = gsl::narrow_cast<std::int32_t>(
+        sizeof(std::int32_t));
+
+    utils::handle_cuda_error(
+        cudaFuncSetAttribute(k_sym_shmem,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             meta.sym_table_sizes[meta.n_bins - 2] * IdxByteSize));
+    for (std::int32_t i = meta.n_bins - 2; i > 0; i--) {
+        if (meta.h_bin_sizes[i] > 0) {
+            SPDLOG_DEBUG("Sym: bin {} size is {}", i, meta.h_bin_sizes[i]);
+            utils::launch_kernel(k_sym_shmem,
+                                 meta.h_bin_sizes[i],
+                                 meta.sym_block_sizes[i],
+                                 meta.sym_table_sizes[i] * IdxByteSize,
+                                 meta.streams[i],
+                                 meta.sym_table_sizes[i],
+                                 A.rpt,
+                                 A.col,
+                                 B.rpt,
+                                 B.col,
+                                 meta.d_bins + meta.h_bin_offsets[i],
+                                 C.rpt);
+        }
     }
     if (meta.h_bin_sizes[0] > 0) {
         SPDLOG_DEBUG("Sym: bin 0 size is {}", meta.h_bin_sizes[0]);
-        const auto n_blocks = cuda::ceil_div(meta.h_bin_sizes[0], PWARP_ROWS);
-        k_sym_shmem_pwarp<32><<<n_blocks, PWARP_BLOCK_SIZE, 0, meta.streams[0]>>>(
-            A.rpt,
-            A.col,
-            B.rpt,
-            B.col,
-            meta.d_bins + meta.h_bin_offsets[0],
-            meta.h_bin_sizes[0],
-            C.rpt);
+        const auto rows_per_block = device.optimal_block_size / PWARP;
+        utils::launch_kernel(k_sym_shmem_pwarp,
+                             cuda::ceil_div(meta.h_bin_sizes[0], rows_per_block),
+                             device.optimal_block_size,
+                             (meta.sym_table_sizes[0] + rows_per_block) * IdxByteSize,
+                             meta.streams[0],
+                             meta.sym_table_sizes[0] / rows_per_block,
+                             A.rpt,
+                             A.col,
+                             B.rpt,
+                             B.col,
+                             meta.d_bins + meta.h_bin_offsets[0],
+                             meta.h_bin_sizes[0],
+                             C.rpt);
     }
 
     for (std::int32_t i = 0; i < meta.n_bins; i++)
