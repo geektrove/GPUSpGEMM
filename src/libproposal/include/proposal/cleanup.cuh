@@ -11,6 +11,10 @@ inline auto cleanup(Meta& meta) -> void {
     NVTX3_FUNC_RANGE();
     SPDLOG_DEBUG("Free device memory asynchronously");
     utils::free_async(meta.d_ptr);
+    if (meta.d_mem_pool != nullptr) {
+        SPDLOG_DEBUG("Free device memory pool asynchronously");
+        utils::free_async<utils::Location::Device>(meta.d_mem_pool);
+    }
     SPDLOG_DEBUG("Free host memory");
     utils::free<utils::Location::Host>(meta.h_ptr);
     SPDLOG_DEBUG("Destroy streams");
