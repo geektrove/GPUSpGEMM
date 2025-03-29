@@ -168,7 +168,7 @@ __global__ void k_sym_smem_max(
     __grid_constant__ std::int32_t* const __restrict__ fail_bin,
     __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
     extern __shared__ std::int32_t s_table[];
-    __shared__ std::int32_t s_nnz;
+    auto* s_nnz = s_table + table_size;
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
@@ -193,10 +193,10 @@ __global__ void k_sym_smem_max(
         for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
             const auto key = b_col[k];
             auto hash = (key * HASH_SCALE) % table_size;
-            while (s_nnz <= threshold) {
+            while (*s_nnz <= threshold) {
                 const auto old = atomicCAS_block(s_table + hash, -1, key);
                 if (old == -1) {
-                    atomicAdd_block(&s_nnz, 1);
+                    atomicAdd_block(s_nnz, 1);
                     break;
                 }
                 if (old == key)
@@ -208,7 +208,7 @@ __global__ void k_sym_smem_max(
     block.sync();
 
     cg::invoke_one(block, [&] {
-        const auto nnz = s_nnz;
+        const auto nnz = *s_nnz;
         if (nnz <= threshold) {
             nnzs[row] = nnz;
         } else {

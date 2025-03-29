@@ -242,7 +242,7 @@ void setup(const utils::DeviceCSR<T>& A,
         i++;
     }
     meta.sym_block_sizes[meta.n_bins - 1] = device.max_threads_per_block;
-    meta.sym_table_sizes[meta.n_bins - 1] = calculate_sym_table_size(1, false);
+    meta.sym_table_sizes[meta.n_bins - 1] = calculate_sym_table_size(1, false) - 1;
 
     meta.h_sym_bin_ranges[0] = gsl::narrow_cast<std::int32_t>(
         SYM_RANGE_RATIO
