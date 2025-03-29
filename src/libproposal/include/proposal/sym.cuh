@@ -401,6 +401,7 @@ void sym(const utils::DeviceCSR<T>& A,
         }
     }
 
+    // Wait for all bins to finish
     for (std::int32_t i = 0; i < meta.n_bins; i++)
         utils::stream_sync(meta.streams[i]);
 
