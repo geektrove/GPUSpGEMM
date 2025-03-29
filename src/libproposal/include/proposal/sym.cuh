@@ -389,9 +389,9 @@ void sym(const utils::DeviceCSR<T>& A,
     }
 
     // Handle the fail bin
-    SPDLOG_DEBUG("Sym: fail bin size is {}", h_fail_bin_size);
     if (last_bin_size > 0) {
         utils::event_sync(meta.events[0]);
+        SPDLOG_DEBUG("Sym: fail bin size is {}", h_fail_bin_size);
         if (h_fail_bin_size > 0) {
             const auto table_size = *meta.h_max_row_nnz;
             meta.mem_pool_size = gsl::narrow_cast<std::size_t>(h_fail_bin_size
