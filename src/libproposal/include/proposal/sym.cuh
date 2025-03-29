@@ -66,7 +66,7 @@ __forceinline__ __device__ auto fill_table(const std::int32_t* const __restrict_
     }
 }
 
-__global__ void k_sym_shmem_pwarp(
+__global__ void k_sym_smem_pwarp(
     const __grid_constant__ std::int32_t table_size,
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ a_col,
@@ -118,14 +118,13 @@ __global__ void k_sym_shmem_pwarp(
         nnzs[row] = *s_nnz;
 }
 
-__global__ void k_sym_shmem(
-    const __grid_constant__ std::int32_t table_size,
-    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ a_col,
-    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ b_col,
-    const __grid_constant__ std::int32_t* const __restrict__ bins,
-    __grid_constant__ std::int32_t* const __restrict__ nnzs) {
+__global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
+                           const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                           const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                           const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                           const __grid_constant__ std::int32_t* const __restrict__ b_col,
+                           const __grid_constant__ std::int32_t* const __restrict__ bins,
+                           __grid_constant__ std::int32_t* const __restrict__ nnzs) {
     extern __shared__ std::int32_t s_table[];
     __shared__ std::int32_t s_nnz;
 
@@ -169,13 +168,13 @@ void sym(const utils::DeviceCSR<T>& A,
         sizeof(std::int32_t));
 
     utils::handle_cuda_error(
-        cudaFuncSetAttribute(k_sym_shmem,
+        cudaFuncSetAttribute(k_sym_smem,
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
                              meta.sym_table_sizes[meta.n_bins - 2] * IdxByteSize));
     for (std::int32_t i = meta.n_bins - 2; i > 0; i--) {
         if (meta.h_bin_sizes[i] > 0) {
             SPDLOG_DEBUG("Sym: bin {} size is {}", i, meta.h_bin_sizes[i]);
-            utils::launch_kernel(k_sym_shmem,
+            utils::launch_kernel(k_sym_smem,
                                  meta.h_bin_sizes[i],
                                  meta.sym_block_sizes[i],
                                  meta.sym_table_sizes[i] * IdxByteSize,
@@ -192,7 +191,7 @@ void sym(const utils::DeviceCSR<T>& A,
     if (meta.h_bin_sizes[0] > 0) {
         SPDLOG_DEBUG("Sym: bin 0 size is {}", meta.h_bin_sizes[0]);
         const auto rows_per_block = device.optimal_block_size / PWARP;
-        utils::launch_kernel(k_sym_shmem_pwarp,
+        utils::launch_kernel(k_sym_smem_pwarp,
                              cuda::ceil_div(meta.h_bin_sizes[0], rows_per_block),
                              device.optimal_block_size,
                              (meta.sym_table_sizes[0] + rows_per_block) * IdxByteSize,
