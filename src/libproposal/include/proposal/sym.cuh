@@ -359,10 +359,15 @@ void sym(const utils::DeviceCSR<T>& A,
     SPDLOG_DEBUG("Sym: bin 0 size is {}", meta.h_bin_sizes[0]);
     if (meta.h_bin_sizes[0] > 0) {
         const auto rows_per_block = device.optimal_block_size / PWARP;
+        const auto smem = (meta.sym_table_sizes[0] + rows_per_block) * IdxByteSize;
+        utils::handle_cuda_error(
+            cudaFuncSetAttribute(k_sym_smem_pwarp,
+                                 cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                 smem));
         utils::launch_kernel(k_sym_smem_pwarp,
                              cuda::ceil_div(meta.h_bin_sizes[0], rows_per_block),
                              device.optimal_block_size,
-                             (meta.sym_table_sizes[0] + rows_per_block) * IdxByteSize,
+                             smem,
                              meta.streams[0],
                              meta.sym_table_sizes[0] / rows_per_block,
                              A.rpt,
