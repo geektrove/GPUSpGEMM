@@ -184,7 +184,7 @@ __global__ void k_sym_smem_max(
 
     for (auto i = tib; i < table_size; i += block_size)
         s_table[i] = -1;
-    cg::invoke_one(block, [&] { s_nnz = 0; });
+    cg::invoke_one(block, [&] { *s_nnz = 0; });
 
     const auto row = bins[grid.block_rank()];
     const auto i_offset = tib / WARP_SIZE;
