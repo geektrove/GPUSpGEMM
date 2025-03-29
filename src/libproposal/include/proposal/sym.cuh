@@ -92,8 +92,8 @@ __global__ void k_sym_smem_pwarp(
 
     for (auto i = tib; i < total_table_size; i += block_size)
         s_tables[i] = -1;
-    if (tib % PWARP == 0)
-        s_nnzs[tib / PWARP] = 0;
+    if (tib < rows_per_block)
+        s_nnzs[tib] = 0;
     const auto row_id = tig / PWARP;
     if (row_id >= bin_size)
         return;
