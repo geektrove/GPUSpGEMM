@@ -25,48 +25,6 @@ namespace cg = cooperative_groups;
 inline constexpr std::int32_t WARP_SIZE = 32;
 inline constexpr std::int32_t HASH_SCALE = 107;
 
-__forceinline__ __device__ auto insert_to_table(std::int32_t* const __restrict__ table,
-                                                const std::int32_t size,
-                                                const std::int32_t key) -> bool {
-    auto hash = (key * HASH_SCALE) % size;
-    while (true) {
-        const auto old = atomicCAS_block(table + hash, -1, key);
-        if (old == -1)
-            return true;
-        if (old == key)
-            return false;
-        hash = (hash + 1) % size;
-    }
-}
-
-__forceinline__ __device__ auto fill_table(const std::int32_t* const __restrict__ a_rpt,
-                                           const std::int32_t* const __restrict__ a_col,
-                                           const std::int32_t* const __restrict__ b_rpt,
-                                           const std::int32_t* const __restrict__ b_col,
-                                           const std::int32_t threads_per_row_a,
-                                           const std::int32_t threads_per_row_b,
-                                           const std::int32_t thread_idx,
-                                           const std::int32_t row,
-                                           std::int32_t* const __restrict__ table,
-                                           const std::int32_t size,
-                                           std::int32_t* const __restrict__ nnz) {
-    assert(utils::ispow2(threads_per_row_a));
-    assert(utils::ispow2(threads_per_row_b));
-    assert(threads_per_row_a % threads_per_row_b == 0);
-
-    const auto i_offset = (thread_idx % threads_per_row_a) / threads_per_row_b;
-    const auto i_step = threads_per_row_a / threads_per_row_b;
-    const auto k_offset = thread_idx % threads_per_row_b;
-    const auto k_step = threads_per_row_b;
-    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
-        const auto colrow = a_col[i];
-        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
-            if (insert_to_table(table, size, b_col[k]))
-                atomicAdd_block(nnz, 1);
-        }
-    }
-}
-
 __global__ void k_sym_smem_pwarp(
     const __grid_constant__ std::int32_t table_size,
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
@@ -147,17 +105,27 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
     block.sync();
 
     const auto row = bins[grid.block_rank()];
-    fill_table(a_rpt,
-               a_col,
-               b_rpt,
-               b_col,
-               block_size,
-               WARP_SIZE,
-               tib,
-               row,
-               s_table,
-               table_size,
-               &s_nnz);
+    const auto i_offset = (tib % block_size) / WARP_SIZE;
+    const auto i_step = block_size / WARP_SIZE;
+    const auto k_offset = tib % WARP_SIZE;
+    const auto k_step = WARP_SIZE;
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+        const auto colrow = a_col[i];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+            const auto key = b_col[k];
+            auto hash = (key * HASH_SCALE) % table_size;
+            while (true) {
+                const auto old = atomicCAS_block(s_table + hash, -1, key);
+                if (old == -1) {
+                    atomicAdd_block(&s_nnz, 1);
+                    break;
+                }
+                if (old == key)
+                    break;
+                hash = (hash + 1) % table_size;
+            }
+        }
+    }
     block.sync();
 
     cg::invoke_one(block, [&] { nnzs[row] = s_nnz; });
