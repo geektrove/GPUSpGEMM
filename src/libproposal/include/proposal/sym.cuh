@@ -157,6 +157,67 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
     cg::invoke_one(block, [&] { nnzs[row] = s_nnz; });
 }
 
+__global__ void k_sym_smem_max(
+    const __grid_constant__ std::int32_t table_size,
+    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+    const __grid_constant__ std::int32_t* const __restrict__ a_col,
+    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+    const __grid_constant__ std::int32_t* const __restrict__ b_col,
+    const __grid_constant__ std::int32_t* const __restrict__ bins,
+    __grid_constant__ std::int32_t* const __restrict__ nnzs,
+    __grid_constant__ std::int32_t* const __restrict__ fail_bin,
+    __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
+    extern __shared__ std::int32_t s_table[];
+    __shared__ std::int32_t s_nnz;
+
+    const auto grid = cg::this_grid();
+    const auto block = cg::this_thread_block();
+    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
+    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
+
+    for (auto i = tib; i < table_size; i += block_size)
+        s_table[i] = -1;
+    cg::invoke_one(block, [&] { s_nnz = 0; });
+
+    const auto row = bins[grid.block_rank()];
+    const auto i_offset = tib / WARP_SIZE;
+    const auto i_step = block_size / WARP_SIZE;
+    const auto k_offset = tib % WARP_SIZE;
+    const auto k_step = WARP_SIZE;
+    const auto threshold = table_size * SYM_RANGE_RATIO;
+
+    block.sync();
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+        const auto colrow = a_col[i];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+            const auto key = b_col[k];
+            auto hash = (key * HASH_SCALE) % table_size;
+            while (s_nnz <= threshold) {
+                const auto old = atomicCAS_block(s_table + hash, -1, key);
+                if (old == -1) {
+                    atomicAdd_block(&s_nnz, 1);
+                    break;
+                }
+                if (old == key)
+                    break;
+                hash = hash + 1 < table_size ? hash + 1 : 0;
+            }
+        }
+    }
+    block.sync();
+
+    cg::invoke_one(block, [&] {
+        const auto nnz = s_nnz;
+        if (nnz <= threshold) {
+            nnzs[row] = nnz;
+        } else {
+            const auto idx = atomicAdd(fail_bin_size, 1);
+            fail_bin[idx] = row;
+        }
+    });
+}
+
 template<std::floating_point T>
 void sym(const utils::DeviceCSR<T>& A,
          const utils::DeviceCSR<T>& B,
