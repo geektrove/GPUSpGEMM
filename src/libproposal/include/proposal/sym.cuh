@@ -97,25 +97,31 @@ __global__ void k_sym_smem_pwarp(
     const auto row_id = tig / PWARP;
     if (row_id >= bin_size)
         return;
-    block.sync();
-
     auto* s_table = s_tables + (static_cast<ptrdiff_t>((tib / PWARP) * table_size));
     auto* s_nnz = s_nnzs + (tib / PWARP);
     const auto row = bins[row_id];
-    fill_table(a_rpt,
-               a_col,
-               b_rpt,
-               b_col,
-               PWARP,
-               1,
-               tib,
-               row,
-               s_table,
-               table_size,
-               s_nnz);
     block.sync();
 
-    if (block.thread_rank() % PWARP == 0)
+    for (auto i = a_rpt[row] + (tib % PWARP); i < a_rpt[row + 1]; i += PWARP) {
+        const auto colrow = a_col[i];
+        for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
+            const auto key = b_col[k];
+            auto hash = (key * HASH_SCALE) % table_size;
+            while (true) {
+                const auto old = atomicCAS_block(s_table + hash, -1, key);
+                if (old == -1) {
+                    atomicAdd_block(s_nnz, 1);
+                    break;
+                }
+                if (old == key)
+                    break;
+                hash = (hash + 1) % table_size;
+            }
+        }
+    }
+    block.sync();
+
+    if (tib % PWARP == 0)
         nnzs[row] = *s_nnz;
 }
 
