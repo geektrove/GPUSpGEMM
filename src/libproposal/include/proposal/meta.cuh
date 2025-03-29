@@ -13,6 +13,7 @@ struct Meta {
 
     std::int32_t n_bins{};
     std::size_t cub_storage_size{};
+    std::size_t mem_pool_size{};
 
     // Host memory (combined)
     void* h_ptr{};
@@ -33,4 +34,7 @@ struct Meta {
     std::int32_t* d_max_row_nnz{};    // size 1
     std::int32_t* d_total_nnz{};      // size 1
     void* d_cub_storage{};            // size cub_storage_size
+
+    // Device memory (separate)
+    void* d_mem_pool{};
 };
