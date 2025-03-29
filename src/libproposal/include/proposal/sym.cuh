@@ -52,9 +52,6 @@ __forceinline__ __device__ auto fill_table(const std::int32_t* const __restrict_
     assert(utils::ispow2(threads_per_row_a));
     assert(utils::ispow2(threads_per_row_b));
     assert(threads_per_row_a % threads_per_row_b == 0);
-    __builtin_assume(utils::ispow2(threads_per_row_a));
-    __builtin_assume(utils::ispow2(threads_per_row_b));
-    __builtin_assume(threads_per_row_a % threads_per_row_b == 0);
 
     const auto i_offset = (thread_idx % threads_per_row_a) / threads_per_row_b;
     const auto i_step = threads_per_row_a / threads_per_row_b;
