@@ -39,6 +39,11 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     sym(A, B, C, meta, device);
     SPDLOG_DEBUG("Finished symbolic phase");
 
+    // Symbolic binning 2
+    SPDLOG_DEBUG("Starting symbolic binning 2 phase");
+    sym_binning2(C, meta, device);
+    SPDLOG_DEBUG("Finished symbolic binning 2 phase");
+
     // Cleanup
     SPDLOG_DEBUG("Starting cleanup phase");
     cleanup(meta);
