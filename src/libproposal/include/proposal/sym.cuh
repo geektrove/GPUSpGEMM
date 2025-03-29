@@ -22,6 +22,7 @@
 
 namespace cg = cooperative_groups;
 
+inline constexpr std::int32_t WARP_SIZE = 32;
 inline constexpr std::int32_t HASH_SCALE = 107;
 
 __forceinline__ __device__ auto insert_to_table(std::int32_t* const __restrict__ table,
@@ -130,7 +131,7 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto warp = cg::tiled_partition<32>(block);
+    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
@@ -145,7 +146,7 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
                b_rpt,
                b_col,
                block_size,
-               warp.num_threads(),
+               WARP_SIZE,
                tib,
                row,
                s_table,
