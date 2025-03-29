@@ -95,7 +95,6 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
@@ -146,7 +145,6 @@ __global__ void k_sym_smem_max(
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
@@ -208,7 +206,6 @@ __global__ void k_sym_global(
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
