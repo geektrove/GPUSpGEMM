@@ -14,7 +14,6 @@
 
 namespace cg = cooperative_groups;
 
-inline constexpr std::int32_t WARP_SIZE = 32;
 inline constexpr std::int32_t HASH_SCALE = 107;
 
 __global__ void k_sym_smem_pwarp(
