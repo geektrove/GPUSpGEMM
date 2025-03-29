@@ -70,6 +70,11 @@ inline auto event_record(cudaEvent_t event, cudaStream_t stream = cudaStreamDefa
     handle_cuda_error(cudaEventRecord(event, stream));
 }
 
+inline auto stream_wait_event(cudaEvent_t event, cudaStream_t stream = cudaStreamDefault)
+    -> void {
+    handle_cuda_error(cudaStreamWaitEvent(stream, event));
+}
+
 inline auto stream_sync(cudaStream_t stream = cudaStreamDefault) -> void {
     handle_cuda_error(cudaStreamSynchronize(stream));
 }
