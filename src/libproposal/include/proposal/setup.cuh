@@ -201,12 +201,28 @@ void setup(const utils::DeviceCSR<T>& A,
     for (std::int32_t i = 0; i < meta.n_bins; i++)
         utils::handle_cuda_error(cudaStreamCreate(&meta.streams[i]));
 
-    // Allocate device memory
+    // Estimate CUB storage size
+    size_t cub_requested{};
     cub::DeviceScan::ExclusiveSum(nullptr,
-                                  meta.cub_storage_size,
+                                  cub_requested,
                                   static_cast<std::int32_t*>(nullptr),
                                   static_cast<std::int32_t*>(nullptr),
                                   C.m + 1);
+    meta.cub_storage_size = cub_requested;
+    cub::DeviceReduce::Max(nullptr,
+                           cub_requested,
+                           static_cast<std::int32_t*>(nullptr),
+                           static_cast<std::int32_t*>(nullptr),
+                           C.m);
+    meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
+    cub::DeviceReduce::Sum(nullptr,
+                           cub_requested,
+                           static_cast<std::int32_t*>(nullptr),
+                           static_cast<std::int32_t*>(nullptr),
+                           C.m);
+    meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
+
+    // Allocate device memory
     const auto d_memsize = (C.m + 3 * meta.n_bins + 2) * sizeof(std::int32_t)
                            + meta.cub_storage_size;
     meta.d_ptr = utils::malloc_async(d_memsize, meta.streams[0]);
