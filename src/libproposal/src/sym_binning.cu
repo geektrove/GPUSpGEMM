@@ -14,7 +14,7 @@ namespace {
 __forceinline__ __device__ auto find_bin(const std::int32_t* const __restrict__ ranges,
                                          const std::int32_t n_bins,
                                          const std::int32_t x) -> std::int32_t {
-    for (int i = 0; i < n_bins; i++) {
+    for (std::int32_t i = 0; i < n_bins; i++) {
         if (x <= ranges[i])
             return i;
     }
@@ -36,7 +36,7 @@ __global__ void k_sym_binning1(
     const auto bid = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     if (bid < n_bins)
-        s_bin_sizes[block.thread_rank()] = 0;
+        s_bin_sizes[bid] = 0;
     block.sync();
 
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
@@ -64,24 +64,24 @@ __global__ void k_sym_binning2(
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto bid = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
-    if (bid < n_bins)
-        s_bin_sizes[block.thread_rank()] = 0;
+    if (tib < n_bins)
+        s_bin_sizes[tib] = 0;
     block.sync();
 
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
-    int bin_idx = 0;
+    std::int32_t bin_idx = 0;
     if (row < m) {
         bin_idx = find_bin(ranges, n_bins, nips[row]);
         atomicAdd_block(s_bin_sizes + bin_idx, 1);
     }
     block.sync();
 
-    if (bid < n_bins) {
-        s_bin_offsets[bid] = atomicAdd(bin_sizes + bid, s_bin_sizes[bid]);
-        s_bin_offsets[bid] += bin_offsets[bid];
-        s_bin_sizes[bid] = 0;
+    if (tib < n_bins) {
+        s_bin_offsets[tib] = atomicAdd(bin_sizes + tib, s_bin_sizes[tib]);
+        s_bin_offsets[tib] += bin_offsets[tib];
+        s_bin_sizes[tib] = 0;
     }
     block.sync();
 
