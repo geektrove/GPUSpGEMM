@@ -399,10 +399,12 @@ void sym(const utils::DeviceCSR<T>& A,
                                  static_cast<std::int32_t*>(meta.d_mem_pool),
                                  C.rpt);
         }
-        if (d_fail_bin != meta.d_cub_storage)
-            utils::free_async(d_fail_bin, meta.streams[last_bin_idx]);
     }
 
     for (std::int32_t i = 0; i < meta.n_bins; i++)
         utils::stream_sync(meta.streams[i]);
+
+    // No need to wait for the fail bin deallocation
+    if (d_fail_bin != nullptr && d_fail_bin != meta.d_cub_storage)
+        utils::free_async(d_fail_bin, meta.streams[last_bin_idx]);
 }
