@@ -186,8 +186,8 @@ __global__ void k_sym_smem_max(
     const auto k_offset = tib % WARP_SIZE;
     const auto k_step = WARP_SIZE;
     const auto threshold = table_size * SYM_RANGE_RATIO;
-
     block.sync();
+
     for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
