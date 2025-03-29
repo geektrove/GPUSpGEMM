@@ -30,10 +30,42 @@ __global__ void k_compute_nip(
     __grid_constant__ std::int32_t* const __restrict__ max_nip) {
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
+    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
     const auto tile = cg::tiled_partition<BLOCK_SIZE>(block);
 
-    const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
+    const auto& tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
+    const auto& tiw = gsl::narrow_cast<std::int32_t>(warp.thread_rank());
+
+    const auto row_length = tig < m ? a_rpt[tig + 1] - a_rpt[tig] : 0;
+    const auto row_length_max = cg::reduce(warp, row_length, cg::greater<std::int32_t>{});
     const auto l_nip = cuda::std::invoke([&] {
+        // If the maximum row length across wap is greater than threshold,
+        // use a warp per row
+        if (row_length_max >= WARP_SIZE) {
+            std::int32_t thread_row_nip = 0;
+            auto row_begin = (tig / WARP_SIZE) * WARP_SIZE;
+            for (std::int32_t row_offset = 0; row_offset < WARP_SIZE; row_offset++) {
+                const auto row = row_begin + row_offset;
+                if (row >= m)
+                    break;
+                std::int32_t l_row_nip = 0;
+                for (auto j = a_rpt[row] + tiw; j < a_rpt[row + 1]; j += WARP_SIZE) {
+                    const auto col = a_col[j];
+                    l_row_nip += b_rpt[col + 1] - b_rpt[col];
+                }
+                const auto row_nip = cg::reduce(warp,
+                                                l_row_nip,
+                                                cg::plus<std::int32_t>{});
+                if (row_offset == tiw) {
+                    thread_row_nip = row_nip;
+                    nips[row] = row_nip;
+                }
+            }
+            return thread_row_nip;
+        }
+
+        // Otherwise, use a single thread per row
+        const auto row = tig;
         if (row >= m)
             return 0;
         std::int32_t row_nip = 0;
