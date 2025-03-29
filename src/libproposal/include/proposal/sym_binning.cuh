@@ -37,12 +37,6 @@ inline void small_binning(const std::int32_t m, Meta& meta) {
         d_bins[i] = static_cast<std::int32_t>(i);
     };
 
-    if constexpr (utils::IS_DEBUG) {
-        size_t cub_requested{};
-        cub::DeviceFor::Bulk(nullptr, cub_requested, m, op);
-        assert(cub_requested <= meta.cub_storage_size);
-    }
-
     // Perform iota operation to fill the smallest bin with row indices
     utils::handle_cuda_error(
         cub::DeviceFor::Bulk(meta.d_cub_storage, meta.cub_storage_size, m, op));

@@ -203,11 +203,7 @@ void setup(const utils::DeviceCSR<T>& A,
 
     // Estimate CUB storage size
     size_t cub_requested{};
-    cub::DeviceScan::ExclusiveSum(nullptr,
-                                  cub_requested,
-                                  static_cast<std::int32_t*>(nullptr),
-                                  static_cast<std::int32_t*>(nullptr),
-                                  C.m + 1);
+    cub::DeviceFor::Bulk(nullptr, cub_requested, C.m, [] __device__(int) {});
     meta.cub_storage_size = cub_requested;
     cub::DeviceReduce::Max(nullptr,
                            cub_requested,
@@ -220,6 +216,12 @@ void setup(const utils::DeviceCSR<T>& A,
                            static_cast<std::int32_t*>(nullptr),
                            static_cast<std::int32_t*>(nullptr),
                            C.m);
+    meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
+    cub::DeviceScan::ExclusiveSum(nullptr,
+                                  cub_requested,
+                                  static_cast<std::int32_t*>(nullptr),
+                                  static_cast<std::int32_t*>(nullptr),
+                                  C.m + 1);
     meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
 
     // Allocate device memory
