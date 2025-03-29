@@ -247,7 +247,7 @@ void setup(const utils::DeviceCSR<T>& A,
     meta.h_sym_bin_ranges[0] = gsl::narrow_cast<std::int32_t>(
         SYM_RANGE_RATIO
         * gsl::narrow_cast<double>(meta.sym_table_sizes[0]
-                                   / (meta.sym_block_sizes[0] / PWARP)));
+                                   / (meta.sym_block_sizes[0] / PWARP_SIZE)));
     for (i = 1; i + 1 < meta.n_bins; i++)
         meta.h_sym_bin_ranges[i] = gsl::narrow_cast<std::int32_t>(
             SYM_RANGE_RATIO * meta.sym_table_sizes[i]);
