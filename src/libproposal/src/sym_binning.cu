@@ -85,7 +85,7 @@ __global__ void k_sym_binning2(
     }
     block.sync();
 
-    if (bid < m) {
+    if (row < m) {
         const auto index = atomicAdd_block(s_bin_sizes + bin_idx, 1);
         bins[s_bin_offsets[bin_idx] + index] = row;
     }
