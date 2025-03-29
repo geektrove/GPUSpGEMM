@@ -184,6 +184,7 @@ void setup(const utils::DeviceCSR<T>& A,
     meta.d_bin_offsets = meta.d_bin_sizes + meta.n_bins;
     meta.d_max_row_nnz = meta.d_bin_offsets + meta.n_bins;
     meta.d_total_nnz = meta.d_max_row_nnz + 1;
+    meta.d_cub_storage = meta.d_total_nnz + 1;
 
     SPDLOG_DEBUG("Allocated memory on device: {}", d_memsize);
     SPDLOG_DEBUG("-- CUB memory on device: {}", meta.cub_storage_size);
