@@ -142,17 +142,30 @@ void setup(const utils::DeviceCSR<T>& A,
     // Get device properties and compute optimal block size
     int id{};
     utils::handle_cuda_error(cudaGetDevice(&id));
-    cudaDeviceProp prop{};
-    utils::handle_cuda_error(cudaGetDeviceProperties(&prop, id));
-    device.n_sm = prop.multiProcessorCount;
-    device.max_threads_per_sm = prop.maxThreadsPerMultiProcessor;
-    device.max_threads_per_block = prop.maxThreadsPerBlock;
-    device.max_blocks_per_sm = prop.maxBlocksPerMultiProcessor;
-    device.smem_per_sm = gsl::narrow_cast<std::int32_t>(prop.sharedMemPerMultiprocessor);
-    device.smem_per_block_reserved = gsl::narrow_cast<std::int32_t>(
-        prop.reservedSharedMemPerBlock);
-    device.max_smem_per_block = gsl::narrow_cast<std::int32_t>(
-        prop.sharedMemPerBlockOptin);
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.n_sm, cudaDevAttrMultiProcessorCount, id));
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.max_threads_per_sm,
+                               cudaDevAttrMaxThreadsPerMultiProcessor,
+                               id));
+    utils::handle_cuda_error(cudaDeviceGetAttribute(&device.max_threads_per_block,
+                                                    cudaDevAttrMaxThreadsPerBlock,
+                                                    id));
+    utils::handle_cuda_error(cudaDeviceGetAttribute(&device.max_blocks_per_sm,
+                                                    cudaDevAttrMaxBlocksPerMultiprocessor,
+                                                    id));
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.smem_per_sm,
+                               cudaDevAttrMaxSharedMemoryPerMultiprocessor,
+                               id));
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.smem_per_block_reserved,
+                               cudaDevAttrReservedSharedMemoryPerBlock,
+                               id));
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.max_smem_per_block,
+                               cudaDevAttrMaxSharedMemoryPerBlockOptin,
+                               id));
 
     device.optimal_block_size = std::invoke([&] {
         auto block_size = device.max_threads_per_block;
@@ -161,8 +174,6 @@ void setup(const utils::DeviceCSR<T>& A,
         return block_size;
     });
 
-    SPDLOG_DEBUG("Device name: {}", prop.name);
-    SPDLOG_DEBUG("Compute capability: {}.{}", prop.major, prop.minor);
     SPDLOG_DEBUG("Number of SMs: {}", device.n_sm);
     SPDLOG_DEBUG("Max threads per SM: {}", device.max_threads_per_sm);
     SPDLOG_DEBUG("Max threads per block: {}", device.max_threads_per_block);
