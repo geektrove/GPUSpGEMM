@@ -1,6 +1,5 @@
 #pragma once
 
-#include <bit>
 #include <concepts>
 #include <cstdint>
 
@@ -371,5 +370,5 @@ void setup(const utils::DeviceCSR<T>& A,
     utils::stream_sync(meta.streams[0]);
     utils::stream_sync();
 
-    SPDLOG_DEBUG("Maximum NIP per row is {}", *meta.h_max_row_nnz);
+    SPDLOG_DEBUG("Max NIP per row is {}", *meta.h_max_row_nnz);
 }
