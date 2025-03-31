@@ -162,6 +162,13 @@ void sym(const utils::DeviceCSR<T>& A,
                              C.rpt);
     }
 
+    // Prepare bin ranges for symbolic binning 2
+    meta.h_bin_ranges[meta.n_bins - 2] = gsl::narrow_cast<std::int32_t>(
+        SYM_RANGE_RATIO * meta.table_sizes[meta.n_bins - 2]);
+    utils::memcpy_async(meta.d_bin_ranges + (meta.n_bins - 2),
+                        meta.h_bin_ranges + (meta.n_bins - 2),
+                        sizeof(std::int32_t));
+
     // Handle the fail bin
     if (last_bin_size > 0) {
         utils::stream_sync(meta.streams[last_bin_idx]);
@@ -196,4 +203,6 @@ void sym(const utils::DeviceCSR<T>& A,
     // No need to wait for the fail bin deallocation
     if (d_fail_bin != nullptr && d_fail_bin != meta.d_cub_storage)
         utils::free_async(d_fail_bin, meta.streams[last_bin_idx]);
+
+    utils::stream_sync();
 }

@@ -96,21 +96,43 @@ void sym_binning2(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
     utils::memcpy_async(meta.h_max_row_nnz,
                         meta.d_max_row_nnz,
                         sizeof(*meta.h_max_row_nnz));
+    utils::event_record(meta.events[0]);
     utils::handle_cuda_error(cub::DeviceReduce::Sum(meta.d_cub_storage,
                                                     meta.cub_storage_size,
                                                     C.rpt,
                                                     meta.d_total_nnz,
                                                     C.m));
     utils::memcpy_async(meta.h_total_nnz, meta.d_total_nnz, sizeof(*meta.h_total_nnz));
+    utils::event_sync(meta.events[0]);
+
+    SPDLOG_DEBUG("Max NNZ per row is {}", *meta.h_max_row_nnz);
+
+    meta.table_sizes[meta.n_bins - 1] = gsl::narrow_cast<std::int32_t>(*meta.h_max_row_nnz
+                                                                       / SYM_RANGE_RATIO);
+
+    SPDLOG_DEBUG("Symbolic 2 bins");
+    SPDLOG_DEBUG("{:>12s} {:>12s} {:>12s} {:>12s}",
+                 "Bin",
+                 "Block size",
+                 "Table size",
+                 "Sym range");
+    for (std::int32_t i = 0; i < meta.n_bins; i++) {
+        SPDLOG_DEBUG("{:12d} {:12d} {:12d} {:12d}",
+                     i,
+                     meta.block_sizes[i],
+                     meta.table_sizes[i],
+                     meta.h_bin_ranges[i]);
+    }
+
     utils::stream_sync();
 
     C.nnz = *meta.h_total_nnz;
     auto* col_ptr = utils::malloc_async(C.nnz * sizeof(*C.col), meta.streams[0]);
     C.col = static_cast<std::int32_t*>(col_ptr);
 
-    sym_binning(C, meta, device);
+    SPDLOG_DEBUG("C.nnz is {}", C.nnz);
 
-    utils::stream_sync(meta.streams[0]);
+    sym_binning(C, meta, device);
 
     utils::handle_cuda_error(cub::DeviceScan::ExclusiveSum(meta.d_cub_storage,
                                                            meta.cub_storage_size,
@@ -118,5 +140,6 @@ void sym_binning2(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
                                                            C.rpt,
                                                            C.m + 1));
 
+    utils::stream_sync(meta.streams[0]);
     utils::stream_sync();
 }
