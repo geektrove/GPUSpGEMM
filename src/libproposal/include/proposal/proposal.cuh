@@ -13,6 +13,7 @@
 #include <proposal/meta.cuh>
 #include <proposal/setup.cuh>
 #include <proposal/sym.cuh>
+#include <proposal/sym2.cuh>
 #include <proposal/sym_binning.cuh>
 
 template<std::floating_point T>
@@ -43,6 +44,11 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     SPDLOG_DEBUG("Starting symbolic binning 2 phase");
     sym_binning2(C, meta, device);
     SPDLOG_DEBUG("Finished symbolic binning 2 phase");
+
+    // Symbolic 2
+    SPDLOG_DEBUG("Starting symbolic 2 phase");
+    sym2(A, B, C, meta, device);
+    SPDLOG_DEBUG("Finished symbolic 2 phase");
 
     // Cleanup
     SPDLOG_DEBUG("Starting cleanup phase");
