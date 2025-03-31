@@ -107,6 +107,7 @@ void sym_binning2(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
 
     SPDLOG_DEBUG("Max NNZ per row is {}", *meta.h_max_row_nnz);
 
+    // Update the table sizes for the global memory bin
     meta.table_sizes[meta.n_bins - 1] = gsl::narrow_cast<std::int32_t>(*meta.h_max_row_nnz
                                                                        / SYM_RANGE_RATIO);
 
@@ -115,7 +116,7 @@ void sym_binning2(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
                  "Bin",
                  "Block size",
                  "Table size",
-                 "Sym range");
+                 "Range");
     for (std::int32_t i = 0; i < meta.n_bins; i++) {
         SPDLOG_DEBUG("{:12d} {:12d} {:12d} {:12d}",
                      i,
@@ -130,7 +131,7 @@ void sym_binning2(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
     auto* col_ptr = utils::malloc_async(C.nnz * sizeof(*C.col), meta.streams[0]);
     C.col = static_cast<std::int32_t*>(col_ptr);
 
-    SPDLOG_DEBUG("C.nnz is {}", C.nnz);
+    SPDLOG_DEBUG("Total NNZ in C is {}", C.nnz);
 
     sym_binning(C, meta, device);
 

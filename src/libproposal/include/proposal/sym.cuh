@@ -162,7 +162,7 @@ void sym(const utils::DeviceCSR<T>& A,
                              C.rpt);
     }
 
-    // Prepare bin ranges for symbolic binning 2
+    // Update the bin ranges for symbolic binning 2
     meta.h_bin_ranges[meta.n_bins - 2] = gsl::narrow_cast<std::int32_t>(
         SYM_RANGE_RATIO * meta.table_sizes[meta.n_bins - 2]);
     utils::memcpy_async(meta.d_bin_ranges + (meta.n_bins - 2),

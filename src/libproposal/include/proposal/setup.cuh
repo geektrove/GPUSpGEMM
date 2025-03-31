@@ -305,7 +305,7 @@ inline void fill_sizes_for_sym_binning(Meta& meta, const Device& device) {
                  "Bin",
                  "Block size",
                  "Table size",
-                 "Sym range");
+                 "Range");
     for (i = 0; i < meta.n_bins; i++) {
         SPDLOG_DEBUG("{:12d} {:12d} {:12d} {:12d}",
                      i,
