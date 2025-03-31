@@ -133,13 +133,15 @@ __global__ void k_sym_smem_max(
     __grid_constant__ std::int32_t* const __restrict__ nnzs,
     __grid_constant__ std::int32_t* const __restrict__ fail_bin,
     __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
-    extern __shared__ std::int32_t s_table[];
-    auto* s_nnz = s_table + table_size;
+    extern __shared__ std::int32_t smem[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
+
+    auto* s_table = smem;
+    auto* s_nnz = s_table + table_size;
 
     for (auto i = tib; i < table_size; i += block_size)
         s_table[i] = -1;
