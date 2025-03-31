@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <cstdlib>
 
-#include <cooperative_groups.h>
 #include <cub/cub.cuh>
 #include <gsl/gsl-lite.hpp>
 #include <nvtx3/nvtx3.hpp>
