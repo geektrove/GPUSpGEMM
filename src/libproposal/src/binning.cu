@@ -19,6 +19,7 @@ __forceinline__ __device__ auto find_bin(const std::int32_t* const __restrict__ 
         if (x <= ranges[i])
             return i;
     }
+    assert(false);
     __builtin_unreachable();
 }
 
