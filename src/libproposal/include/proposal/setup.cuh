@@ -176,6 +176,20 @@ void h_compute_nip(const utils::DeviceCSR<T>& A,
     }
 }
 
+inline void fill_n_bins(Meta& meta, const Device& device) {
+    // First bin (PWARP) and last bin (max SMEM) are always present
+    meta.n_bins = 2;
+
+    // Add one bin for each power of 2 block size
+    // [MIN_BLOCK_SIZE, MAX_THREADS_PER_BLOCK]
+    meta.n_bins += utils::ilog2(device.max_threads_per_block / device.min_block_size) + 1;
+
+    // Add one bin for each power of 2 table size with MAX_THREADS_PER_BLOCK
+    meta.n_bins += utils::ilog2(device.max_threads_per_sm / device.max_threads_per_block);
+
+    SPDLOG_DEBUG("Number of bins: {}", meta.n_bins);
+}
+
 template<std::floating_point T>
 void setup(const utils::DeviceCSR<T>& A,
            const utils::DeviceCSR<T>& B,
@@ -200,22 +214,7 @@ void setup(const utils::DeviceCSR<T>& A,
     h_compute_nip(A, B, C, device);
 
     // Calculate number of bins
-    meta.n_bins = 2; // First bin (PWARP) and last bin (max SMEM) are always present
-
-    // Minimum block size is MAX_THREADS_PER_SM / MAX_BLOCKS_PER_SM
-    // rounded up to the nearest power of 2
-    const auto min_block_size = gsl::narrow_cast<std::int32_t>(
-        std::bit_ceil(gsl::narrow_cast<std::uint32_t>(device.max_threads_per_sm
-                                                      / device.max_blocks_per_sm)));
-
-    // Add one bin for each power of 2 block size
-    // [MIN_BLOCK_SIZE, MAX_THREADS_PER_BLOCK]
-    meta.n_bins += utils::ilog2(device.max_threads_per_block / min_block_size) + 1;
-
-    // Add one bin for each power of 2 table size with MAX_THREADS_PER_BLOCK
-    meta.n_bins += utils::ilog2(device.max_threads_per_sm / device.max_threads_per_block);
-
-    SPDLOG_DEBUG("Number of bins: {}", meta.n_bins);
+    fill_n_bins(meta, device);
 
     // Create CUDA streams
     auto* streams_ptr = utils::malloc<utils::Location::Host>(meta.n_bins
@@ -298,7 +297,7 @@ void setup(const utils::DeviceCSR<T>& A,
     meta.sym_block_sizes[0] = device.optimal_block_size;
     meta.sym_table_sizes[0] = calculate_sym_table_size(device.max_threads_per_sm
                                                        / meta.sym_block_sizes[0]);
-    meta.sym_block_sizes[1] = min_block_size;
+    meta.sym_block_sizes[1] = device.min_block_size;
     meta.sym_table_sizes[1] = calculate_sym_table_size(device.max_threads_per_sm
                                                        / meta.sym_block_sizes[1]);
     std::int32_t i = 2;
