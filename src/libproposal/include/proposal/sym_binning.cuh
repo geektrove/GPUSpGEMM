@@ -13,44 +13,9 @@
 
 #include <utils/utils.cuh>
 
+#include <proposal/binning.cuh>
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
-
-__global__ void k_sym_binning1(
-    const __grid_constant__ std::int32_t* const __restrict__ ranges,
-    const __grid_constant__ std::int32_t n_bins,
-    const __grid_constant__ std::int32_t* const __restrict__ nips,
-    const __grid_constant__ std::int32_t m,
-    __grid_constant__ std::int32_t* const __restrict__ bin_sizes);
-
-__global__ void k_sym_binning2(
-    const __grid_constant__ std::int32_t* const __restrict__ ranges,
-    const __grid_constant__ std::int32_t n_bins,
-    const __grid_constant__ std::int32_t* const __restrict__ nips,
-    const __grid_constant__ std::int32_t m,
-    const __grid_constant__ std::int32_t* const __restrict__ bin_offsets,
-    __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
-    __grid_constant__ std::int32_t* const __restrict__ bins);
-
-inline void small_binning(const std::int32_t m, Meta& meta) {
-    auto op = [d_bins = meta.d_bins] __device__(int i) {
-        d_bins[i] = static_cast<std::int32_t>(i);
-    };
-
-    // Perform iota operation to fill the smallest bin with row indices
-    utils::handle_cuda_error(
-        cub::DeviceFor::Bulk(meta.d_cub_storage, meta.cub_storage_size, m, op));
-
-    // Set bin sizes and offsets
-    meta.h_bin_sizes[0] = m;
-    for (int i = 1; i < meta.n_bins; i++)
-        meta.h_bin_sizes[i] = 0;
-    meta.h_bin_offsets[0] = 0;
-    for (int i = 1; i < meta.n_bins; i++)
-        meta.h_bin_offsets[i] = m;
-
-    utils::stream_sync();
-}
 
 template<std::floating_point T>
 void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
@@ -66,7 +31,7 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
     // Perform full two-stage symbolic binning
     utils::memset_async(meta.d_bin_sizes, 0, meta.n_bins * sizeof(std::int32_t));
 
-    utils::launch_kernel(k_sym_binning1,
+    utils::launch_kernel(k_binning1,
                          cuda::ceil_div(C.m, device.optimal_block_size),
                          device.optimal_block_size,
                          meta.n_bins * sizeof(std::int32_t),
@@ -92,7 +57,7 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
                         meta.h_bin_offsets,
                         meta.n_bins * sizeof(std::int32_t));
 
-    utils::launch_kernel(k_sym_binning2,
+    utils::launch_kernel(k_binning2,
                          cuda::ceil_div(C.m, device.optimal_block_size),
                          device.optimal_block_size,
                          2 * meta.n_bins * sizeof(std::int32_t),

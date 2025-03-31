@@ -1,11 +1,12 @@
 #include <cstdint>
 
 #include <cooperative_groups.h>
-#include <cooperative_groups/reduce.h>
-#include <cuda/std/functional>
+#include <cub/cub.cuh>
 #include <gsl/gsl-lite.hpp>
 
-#include <proposal/sym_binning.cuh>
+#include <utils/utils.cuh>
+
+#include <proposal/binning.cuh>
 
 namespace cg = cooperative_groups;
 
@@ -23,37 +24,37 @@ __forceinline__ __device__ auto find_bin(const std::int32_t* const __restrict__ 
 
 } // namespace
 
-__global__ void k_sym_binning1(
+__global__ void k_binning1(
     const __grid_constant__ std::int32_t* const __restrict__ ranges,
     const __grid_constant__ std::int32_t n_bins,
-    const __grid_constant__ std::int32_t* const __restrict__ nips,
+    const __grid_constant__ std::int32_t* const __restrict__ values,
     const __grid_constant__ std::int32_t m,
     __grid_constant__ std::int32_t* const __restrict__ bin_sizes) {
     extern __shared__ std::int32_t s_bin_sizes[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto bid = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
-    if (bid < n_bins)
-        s_bin_sizes[bid] = 0;
+    if (tib < n_bins)
+        s_bin_sizes[tib] = 0;
     block.sync();
 
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     if (row < m) {
-        const auto bin_idx = find_bin(ranges, n_bins, nips[row]);
+        const auto bin_idx = find_bin(ranges, n_bins, values[row]);
         atomicAdd_block(s_bin_sizes + bin_idx, 1);
     }
     block.sync();
 
-    if (bid < n_bins)
-        atomicAdd(bin_sizes + bid, s_bin_sizes[bid]);
+    if (tib < n_bins)
+        atomicAdd(bin_sizes + tib, s_bin_sizes[tib]);
 }
 
-__global__ void k_sym_binning2(
+__global__ void k_binning2(
     const __grid_constant__ std::int32_t* const __restrict__ ranges,
     const __grid_constant__ std::int32_t n_bins,
-    const __grid_constant__ std::int32_t* const __restrict__ nips,
+    const __grid_constant__ std::int32_t* const __restrict__ values,
     const __grid_constant__ std::int32_t m,
     const __grid_constant__ std::int32_t* const __restrict__ bin_offsets,
     __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
@@ -73,7 +74,7 @@ __global__ void k_sym_binning2(
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     std::int32_t bin_idx = 0;
     if (row < m) {
-        bin_idx = find_bin(ranges, n_bins, nips[row]);
+        bin_idx = find_bin(ranges, n_bins, values[row]);
         atomicAdd_block(s_bin_sizes + bin_idx, 1);
     }
     block.sync();
@@ -89,4 +90,24 @@ __global__ void k_sym_binning2(
         const auto index = atomicAdd_block(s_bin_sizes + bin_idx, 1);
         bins[s_bin_offsets[bin_idx] + index] = row;
     }
+}
+
+void small_binning(const std::int32_t m, Meta& meta) {
+    auto op = [d_bins = meta.d_bins] __device__(int i) {
+        d_bins[i] = static_cast<std::int32_t>(i);
+    };
+
+    // Perform iota operation to fill the smallest bin with row indices
+    utils::handle_cuda_error(
+        cub::DeviceFor::Bulk(meta.d_cub_storage, meta.cub_storage_size, m, op));
+
+    // Set bin sizes and offsets
+    meta.h_bin_sizes[0] = m;
+    for (int i = 1; i < meta.n_bins; i++)
+        meta.h_bin_sizes[i] = 0;
+    meta.h_bin_offsets[0] = 0;
+    for (int i = 1; i < meta.n_bins; i++)
+        meta.h_bin_offsets[i] = m;
+
+    utils::stream_sync();
 }
