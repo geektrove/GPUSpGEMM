@@ -12,4 +12,5 @@ struct Device {
     std::int32_t max_smem_per_block{};
 
     std::int32_t optimal_block_size{};
+    std::int32_t min_block_size{};
 };

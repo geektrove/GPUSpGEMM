@@ -81,6 +81,60 @@ __global__ void k_compute_nip(
     cg::reduce_update_async(tile, max_nip_ref, l_nip, cg::greater<std::int32_t>{});
 }
 
+inline void fill_device_properties(Device& device) {
+    // Get current device ID
+    int id{};
+    utils::handle_cuda_error(cudaGetDevice(&id));
+
+    // Get device properties
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.n_sm, cudaDevAttrMultiProcessorCount, id));
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.max_threads_per_sm,
+                               cudaDevAttrMaxThreadsPerMultiProcessor,
+                               id));
+    utils::handle_cuda_error(cudaDeviceGetAttribute(&device.max_threads_per_block,
+                                                    cudaDevAttrMaxThreadsPerBlock,
+                                                    id));
+    utils::handle_cuda_error(cudaDeviceGetAttribute(&device.max_blocks_per_sm,
+                                                    cudaDevAttrMaxBlocksPerMultiprocessor,
+                                                    id));
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.smem_per_sm,
+                               cudaDevAttrMaxSharedMemoryPerMultiprocessor,
+                               id));
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.smem_per_block_reserved,
+                               cudaDevAttrReservedSharedMemoryPerBlock,
+                               id));
+    utils::handle_cuda_error(
+        cudaDeviceGetAttribute(&device.max_smem_per_block,
+                               cudaDevAttrMaxSharedMemoryPerBlockOptin,
+                               id));
+
+    // Compute optimal block size (power of 2)
+    device.optimal_block_size = std::invoke([&] {
+        assert(utils::ispow2(device.max_threads_per_block));
+        auto block_size = device.max_threads_per_block;
+        while (device.max_threads_per_sm % block_size != 0)
+            block_size /= 2;
+        return block_size;
+    });
+    device.min_block_size = utils::bitceil(device.max_threads_per_sm
+                                           / device.max_blocks_per_sm);
+
+    SPDLOG_DEBUG("Number of SMs: {}", device.n_sm);
+    SPDLOG_DEBUG("Max threads per SM: {}", device.max_threads_per_sm);
+    SPDLOG_DEBUG("Max threads per block: {}", device.max_threads_per_block);
+    SPDLOG_DEBUG("Max blocks per SM: {}", device.max_blocks_per_sm);
+    SPDLOG_DEBUG("Shared memory per SM: {}", device.smem_per_sm);
+    SPDLOG_DEBUG("Shared memory per block (reserved): {}",
+                 device.smem_per_block_reserved);
+    SPDLOG_DEBUG("Shared memory per block (max opt in): {}", device.max_smem_per_block);
+    SPDLOG_DEBUG("Optimal block size: {}", device.optimal_block_size);
+    SPDLOG_DEBUG("Minimum block size: {}", device.min_block_size);
+}
+
 template<std::floating_point T>
 void h_compute_nip(const utils::DeviceCSR<T>& A,
                    const utils::DeviceCSR<T>& B,
@@ -140,49 +194,7 @@ void setup(const utils::DeviceCSR<T>& A,
     utils::memset_async(C.rpt + C.m, 0, sizeof(std::int32_t));
 
     // Get device properties and compute optimal block size
-    int id{};
-    utils::handle_cuda_error(cudaGetDevice(&id));
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.n_sm, cudaDevAttrMultiProcessorCount, id));
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.max_threads_per_sm,
-                               cudaDevAttrMaxThreadsPerMultiProcessor,
-                               id));
-    utils::handle_cuda_error(cudaDeviceGetAttribute(&device.max_threads_per_block,
-                                                    cudaDevAttrMaxThreadsPerBlock,
-                                                    id));
-    utils::handle_cuda_error(cudaDeviceGetAttribute(&device.max_blocks_per_sm,
-                                                    cudaDevAttrMaxBlocksPerMultiprocessor,
-                                                    id));
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.smem_per_sm,
-                               cudaDevAttrMaxSharedMemoryPerMultiprocessor,
-                               id));
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.smem_per_block_reserved,
-                               cudaDevAttrReservedSharedMemoryPerBlock,
-                               id));
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.max_smem_per_block,
-                               cudaDevAttrMaxSharedMemoryPerBlockOptin,
-                               id));
-
-    device.optimal_block_size = std::invoke([&] {
-        auto block_size = device.max_threads_per_block;
-        while (device.max_threads_per_sm % block_size != 0)
-            block_size /= 2;
-        return block_size;
-    });
-
-    SPDLOG_DEBUG("Number of SMs: {}", device.n_sm);
-    SPDLOG_DEBUG("Max threads per SM: {}", device.max_threads_per_sm);
-    SPDLOG_DEBUG("Max threads per block: {}", device.max_threads_per_block);
-    SPDLOG_DEBUG("Max blocks per SM: {}", device.max_blocks_per_sm);
-    SPDLOG_DEBUG("Shared memory per SM: {}", device.smem_per_sm);
-    SPDLOG_DEBUG("Shared memory per block (reserved): {}",
-                 device.smem_per_block_reserved);
-    SPDLOG_DEBUG("Shared memory per block (max opt in): {}", device.max_smem_per_block);
-    SPDLOG_DEBUG("Optimal block size: {}", device.optimal_block_size);
+    fill_device_properties(device);
 
     // Compute NIP per row in C
     h_compute_nip(A, B, C, device);
