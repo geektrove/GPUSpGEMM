@@ -121,14 +121,14 @@ void sym(const utils::DeviceCSR<T>& A,
     utils::handle_cuda_error(
         cudaFuncSetAttribute(k_sym_smem,
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
-                             meta.table_sizes[meta.n_bins - 3] * IdxByteSize));
+                             (meta.table_sizes[meta.n_bins - 3] + 1) * IdxByteSize));
     for (std::int32_t i = meta.n_bins - 3; i > 0; i--) {
         SPDLOG_DEBUG("Sym: bin {} size is {}", i, meta.h_bin_sizes[i]);
         if (meta.h_bin_sizes[i] > 0) {
             utils::launch_kernel(k_sym_smem,
                                  meta.h_bin_sizes[i],
                                  meta.block_sizes[i],
-                                 meta.table_sizes[i] * IdxByteSize,
+                                 (meta.table_sizes[i] + 1) * IdxByteSize,
                                  meta.streams[i],
                                  meta.table_sizes[i],
                                  A.rpt,
