@@ -191,68 +191,38 @@ inline void fill_n_bins(Meta& meta, const Device& device) {
     SPDLOG_DEBUG("Number of bins: {}", meta.n_bins);
 }
 
-template<std::floating_point T>
-void setup(const utils::DeviceCSR<T>& A,
-           const utils::DeviceCSR<T>& B,
-           utils::DeviceCSR<T>& C,
-           Meta& meta,
-           Device& device) {
-    NVTX3_FUNC_RANGE();
-
-    // Initialize C dimensions
-    C.m = A.m;
-    C.n = B.n;
-
-    // Allocate memory for C.rpt and initialize it to zero
-    auto* rpt = utils::malloc_async((C.m + 1) * sizeof(std::int32_t));
-    C.rpt = static_cast<std::int32_t*>(rpt);
-    utils::memset_async(C.rpt + C.m, 0, sizeof(std::int32_t));
-
-    // Get device properties and compute optimal block size
-    fill_device_properties(device);
-
-    // Compute NIP per row in C
-    h_compute_nip(A, B, C, device);
-
-    // Calculate number of bins
-    fill_n_bins(meta, device);
-
-    // Create CUDA streams
-    auto* streams_ptr = utils::malloc<utils::Location::Host>(meta.n_bins
-                                                             * sizeof(cudaStream_t));
-    meta.streams = static_cast<cudaStream_t*>(streams_ptr);
-    for (std::int32_t i = 0; i < meta.n_bins; i++)
-        utils::handle_cuda_error(cudaStreamCreate(&meta.streams[i]));
-
+inline void allocate_device_mem(const std::int32_t m, Meta& meta) {
     // Estimate CUB storage size
     size_t cub_requested{};
-    cub::DeviceFor::Bulk(nullptr, cub_requested, C.m, [] __device__(int) {});
+    cub::DeviceFor::Bulk(nullptr, cub_requested, m, [] __device__(int) {});
     meta.cub_storage_size = cub_requested;
     cub::DeviceReduce::Max(nullptr,
                            cub_requested,
                            static_cast<std::int32_t*>(nullptr),
                            static_cast<std::int32_t*>(nullptr),
-                           C.m);
+                           m);
     meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
     cub::DeviceReduce::Sum(nullptr,
                            cub_requested,
                            static_cast<std::int32_t*>(nullptr),
                            static_cast<std::int32_t*>(nullptr),
-                           C.m);
+                           m);
     meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
     cub::DeviceScan::ExclusiveSum(nullptr,
                                   cub_requested,
                                   static_cast<std::int32_t*>(nullptr),
                                   static_cast<std::int32_t*>(nullptr),
-                                  C.m + 1);
+                                  m + 1);
     meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
 
     // Allocate device memory
-    const auto d_memsize = (C.m + 3 * meta.n_bins + 2) * sizeof(std::int32_t)
+    const auto d_memsize = ((m + 3 * meta.n_bins + 2) * sizeof(std::int32_t))
                            + meta.cub_storage_size;
     meta.d_ptr = utils::malloc_async(d_memsize, meta.streams[0]);
+
+    // Assign pointers to the allocated memory
     meta.d_bins = static_cast<std::int32_t*>(meta.d_ptr);
-    meta.d_bin_ranges = meta.d_bins + C.m;
+    meta.d_bin_ranges = meta.d_bins + m;
     meta.d_bin_sizes = meta.d_bin_ranges + meta.n_bins;
     meta.d_bin_offsets = meta.d_bin_sizes + meta.n_bins;
     meta.d_max_row_nnz = meta.d_bin_offsets + meta.n_bins;
@@ -261,10 +231,14 @@ void setup(const utils::DeviceCSR<T>& A,
 
     SPDLOG_DEBUG("Allocated memory on device: {}", d_memsize);
     SPDLOG_DEBUG("-- CUB memory on device: {}", meta.cub_storage_size);
+}
 
+inline void allocate_host_memory(Meta& meta) {
     // Allocate host memory
     const auto h_memsize = (5 * meta.n_bins + 2) * sizeof(std::int32_t);
     meta.h_ptr = utils::malloc<utils::Location::Host>(h_memsize);
+
+    // Assign pointers to the allocated memory
     meta.block_sizes = static_cast<std::int32_t*>(meta.h_ptr);
     meta.table_sizes = meta.block_sizes + meta.n_bins;
     meta.h_bin_ranges = meta.table_sizes + meta.n_bins;
@@ -274,11 +248,9 @@ void setup(const utils::DeviceCSR<T>& A,
     meta.h_total_nnz = meta.h_max_row_nnz + 1;
 
     SPDLOG_DEBUG("Allocated memory on host: {}", h_memsize);
+}
 
-    // Copy the maximum NIP per row in C to the host
-    utils::memcpy_async(meta.h_max_row_nnz, C.rpt + C.m, sizeof(std::int32_t));
-
-    // Calculate table sizes and ranges for symbolic binning
+inline void fill_sizes_for_sym_binning(Meta& meta, const Device& device) {
     auto calculate_sym_table_size = [&](std::int32_t n_blocks, bool round_down = true) {
         const auto smem = get_smem_size(device, n_blocks);
         auto table_size = smem / sizeof(std::int32_t);
@@ -331,6 +303,52 @@ void setup(const utils::DeviceCSR<T>& A,
                      meta.table_sizes[i],
                      meta.h_bin_ranges[i]);
     }
+}
+
+template<std::floating_point T>
+void setup(const utils::DeviceCSR<T>& A,
+           const utils::DeviceCSR<T>& B,
+           utils::DeviceCSR<T>& C,
+           Meta& meta,
+           Device& device) {
+    NVTX3_FUNC_RANGE();
+
+    // Initialize C dimensions
+    C.m = A.m;
+    C.n = B.n;
+
+    // Allocate memory for C.rpt and initialize it to zero
+    auto* rpt = utils::malloc_async((C.m + 1) * sizeof(std::int32_t));
+    C.rpt = static_cast<std::int32_t*>(rpt);
+    utils::memset_async(C.rpt + C.m, 0, sizeof(std::int32_t));
+
+    // Get device properties and compute optimal block size
+    fill_device_properties(device);
+
+    // Compute NIP per row in C
+    h_compute_nip(A, B, C, device);
+
+    // Calculate number of bins
+    fill_n_bins(meta, device);
+
+    // Create CUDA streams
+    auto* streams_ptr = utils::malloc<utils::Location::Host>(meta.n_bins
+                                                             * sizeof(cudaStream_t));
+    meta.streams = static_cast<cudaStream_t*>(streams_ptr);
+    for (std::int32_t i = 0; i < meta.n_bins; i++)
+        utils::handle_cuda_error(cudaStreamCreate(&meta.streams[i]));
+
+    // Allocate device memory
+    allocate_device_mem(C.m, meta);
+
+    // Allocate host memory
+    allocate_host_memory(meta);
+
+    // Copy the maximum NIP per row in C to the host
+    utils::memcpy_async(meta.h_max_row_nnz, C.rpt + C.m, sizeof(std::int32_t));
+
+    // Calculate table sizes and ranges for symbolic binning
+    fill_sizes_for_sym_binning(meta, device);
 
     // Copy the symbolic bin ranges to the device
     utils::memcpy_async(meta.d_bin_ranges,
