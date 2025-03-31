@@ -189,7 +189,7 @@ void sym2(const utils::DeviceCSR<T>& A,
         meta.table_sizes[i++] = calculate_num_table_size(1);
         meta.table_sizes[i] = *meta.h_max_row_nnz;
     }
-    meta.h_bin_ranges[0] = meta.table_sizes[0] / (meta.block_sizes[0] / SYM_PWARP_SIZE);
+    meta.h_bin_ranges[0] = meta.table_sizes[0] / (meta.block_sizes[0] / NUM_PWARP_SIZE);
     for (std::int32_t i = 1; i < meta.n_bins; i++)
         meta.h_bin_ranges[i] = meta.table_sizes[i];
     utils::memcpy_async(meta.d_bin_ranges,
