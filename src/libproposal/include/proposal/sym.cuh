@@ -65,14 +65,14 @@ void sym(const utils::DeviceCSR<T>& A,
         sizeof(std::int32_t));
 
     // Handle the largest bin first as it may fail to fit in the shared memory
-    const auto last_bin_idx = meta.n_bins - 2;
-    const auto last_bin_size = meta.h_bin_sizes[last_bin_idx];
+    const auto max_smem_bin_idx = meta.n_bins - 2;
+    const auto max_smem_bin_size = meta.h_bin_sizes[max_smem_bin_idx];
     std::int32_t h_fail_bin_size{};
     std::int32_t* d_fail_bin{};
     std::int32_t* d_fail_bin_size{};
-    SPDLOG_DEBUG("Sym: bin {} size is {}", last_bin_idx, last_bin_size);
-    if (last_bin_size > 0) {
-        auto tmp_mem_size = (last_bin_size + 1) * IdxByteSize;
+    SPDLOG_DEBUG("Sym: bin {} size is {}", max_smem_bin_idx, max_smem_bin_size);
+    if (max_smem_bin_size > 0) {
+        auto tmp_mem_size = (max_smem_bin_size + 1) * IdxByteSize;
         if (tmp_mem_size <= gsl::narrow_cast<std::int32_t>(meta.cub_storage_size)) {
             SPDLOG_DEBUG("CUB storage is enough for fail bins: {} <= {}",
                          tmp_mem_size,
@@ -84,37 +84,37 @@ void sym(const utils::DeviceCSR<T>& A,
                          meta.cub_storage_size);
             auto* d_fail_ptr = utils::malloc_async<utils::Location::Device>(
                 tmp_mem_size,
-                meta.streams[last_bin_idx]);
+                meta.streams[max_smem_bin_idx]);
             d_fail_bin = static_cast<std::int32_t*>(d_fail_ptr);
         }
-        d_fail_bin_size = d_fail_bin + last_bin_size;
+        d_fail_bin_size = d_fail_bin + max_smem_bin_size;
         utils::memset_async(d_fail_bin_size,
                             0,
                             sizeof(std::int32_t),
-                            meta.streams[last_bin_idx]);
-        const auto smem = (meta.table_sizes[last_bin_idx] + 1) * IdxByteSize;
+                            meta.streams[max_smem_bin_idx]);
+        const auto smem = (meta.table_sizes[max_smem_bin_idx] + 1) * IdxByteSize;
         utils::handle_cuda_error(
             cudaFuncSetAttribute(k_sym_smem_max,
                                  cudaFuncAttributeMaxDynamicSharedMemorySize,
                                  smem));
         utils::launch_kernel(k_sym_smem_max,
-                             last_bin_size,
-                             meta.block_sizes[last_bin_idx],
+                             max_smem_bin_size,
+                             meta.block_sizes[max_smem_bin_idx],
                              smem,
-                             meta.streams[last_bin_idx],
-                             meta.table_sizes[last_bin_idx],
+                             meta.streams[max_smem_bin_idx],
+                             meta.table_sizes[max_smem_bin_idx],
                              A.rpt,
                              A.col,
                              B.rpt,
                              B.col,
-                             meta.d_bins + meta.h_bin_offsets[last_bin_idx],
+                             meta.d_bins + meta.h_bin_offsets[max_smem_bin_idx],
                              C.rpt,
                              d_fail_bin,
                              d_fail_bin_size);
         utils::memcpy_async(&h_fail_bin_size,
                             d_fail_bin_size,
                             sizeof(std::int32_t),
-                            meta.streams[last_bin_idx]);
+                            meta.streams[max_smem_bin_idx]);
     }
 
     // Handle the rest of the bins
@@ -170,8 +170,8 @@ void sym(const utils::DeviceCSR<T>& A,
                         sizeof(std::int32_t));
 
     // Handle the fail bin
-    if (last_bin_size > 0) {
-        utils::stream_sync(meta.streams[last_bin_idx]);
+    if (max_smem_bin_size > 0) {
+        utils::stream_sync(meta.streams[max_smem_bin_idx]);
         SPDLOG_DEBUG("Sym: fail bin size is {}", h_fail_bin_size);
         if (h_fail_bin_size > 0) {
             const auto table_size = *meta.h_max_row_nnz;
@@ -179,12 +179,12 @@ void sym(const utils::DeviceCSR<T>& A,
                                                                * table_size)
                                  * IdxByteSize;
             meta.d_mem_pool = utils::malloc_async(meta.mem_pool_size,
-                                                  meta.streams[last_bin_idx]);
+                                                  meta.streams[max_smem_bin_idx]);
             utils::launch_kernel(k_sym_global,
                                  h_fail_bin_size,
-                                 meta.block_sizes[last_bin_idx],
+                                 meta.block_sizes[max_smem_bin_idx],
                                  0,
-                                 meta.streams[last_bin_idx],
+                                 meta.streams[max_smem_bin_idx],
                                  table_size,
                                  A.rpt,
                                  A.col,
@@ -202,7 +202,7 @@ void sym(const utils::DeviceCSR<T>& A,
 
     // No need to wait for the fail bin deallocation
     if (d_fail_bin != nullptr && d_fail_bin != meta.d_cub_storage)
-        utils::free_async(d_fail_bin, meta.streams[last_bin_idx]);
+        utils::free_async(d_fail_bin, meta.streams[max_smem_bin_idx]);
 
     utils::stream_sync();
 }
