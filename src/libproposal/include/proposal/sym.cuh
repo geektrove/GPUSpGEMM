@@ -115,7 +115,6 @@ void sym(const utils::DeviceCSR<T>& A,
                             d_fail_bin_size,
                             sizeof(std::int32_t),
                             meta.streams[last_bin_idx]);
-        utils::event_record(meta.events[0], meta.streams[last_bin_idx]);
     }
 
     // Handle the rest of the bins
@@ -165,7 +164,7 @@ void sym(const utils::DeviceCSR<T>& A,
 
     // Handle the fail bin
     if (last_bin_size > 0) {
-        utils::event_sync(meta.events[0]);
+        utils::stream_sync(meta.streams[last_bin_idx]);
         SPDLOG_DEBUG("Sym: fail bin size is {}", h_fail_bin_size);
         if (h_fail_bin_size > 0) {
             const auto table_size = *meta.h_max_row_nnz;
