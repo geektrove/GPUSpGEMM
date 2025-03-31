@@ -33,7 +33,7 @@ __global__ void k_sym_smem_pwarp(
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
-    const auto rows_per_block = block_size / PWARP_SIZE;
+    const auto rows_per_block = block_size / SYM_PWARP_SIZE;
     const auto total_table_size = table_size * rows_per_block;
 
     auto* s_tables = smem;
@@ -43,15 +43,15 @@ __global__ void k_sym_smem_pwarp(
         s_tables[i] = -1;
     if (tib < rows_per_block)
         s_nnzs[tib] = 0;
-    const auto row_id = tig / PWARP_SIZE;
+    const auto row_id = tig / SYM_PWARP_SIZE;
     if (row_id >= bin_size)
         return;
-    auto* s_table = s_tables + (static_cast<ptrdiff_t>((tib / PWARP_SIZE) * table_size));
-    auto* s_nnz = s_nnzs + (tib / PWARP_SIZE);
+    auto* s_table = s_tables + (static_cast<ptrdiff_t>((tib / SYM_PWARP_SIZE) * table_size));
+    auto* s_nnz = s_nnzs + (tib / SYM_PWARP_SIZE);
     const auto row = bins[row_id];
     block.sync();
 
-    for (auto i = a_rpt[row] + (tib % PWARP_SIZE); i < a_rpt[row + 1]; i += PWARP_SIZE) {
+    for (auto i = a_rpt[row] + (tib % SYM_PWARP_SIZE); i < a_rpt[row + 1]; i += SYM_PWARP_SIZE) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
             const auto key = b_col[k];
@@ -70,7 +70,7 @@ __global__ void k_sym_smem_pwarp(
     }
     block.sync();
 
-    if (tib % PWARP_SIZE == 0)
+    if (tib % SYM_PWARP_SIZE == 0)
         nnzs[row] = *s_nnz;
 }
 

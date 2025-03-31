@@ -265,7 +265,7 @@ inline void fill_sizes_for_sym_binning(Meta& meta, const Device& device) {
     meta.block_sizes[0] = device.optimal_block_size;
     meta.table_sizes[0] = calculate_sym_table_size(
         device.max_threads_per_sm / meta.block_sizes[0],
-        device.optimal_block_size / PWARP_SIZE);
+        device.optimal_block_size / SYM_PWARP_SIZE);
     meta.block_sizes[1] = device.min_block_size;
     meta.table_sizes[1] = calculate_sym_table_size(device.max_threads_per_sm
                                                        / meta.block_sizes[1],
@@ -292,7 +292,7 @@ inline void fill_sizes_for_sym_binning(Meta& meta, const Device& device) {
     meta.h_bin_ranges[0] = gsl::narrow_cast<std::int32_t>(
         SYM_RANGE_RATIO
         * gsl::narrow_cast<double>(meta.table_sizes[0]
-                                   / (meta.block_sizes[0] / PWARP_SIZE)));
+                                   / (meta.block_sizes[0] / SYM_PWARP_SIZE)));
     for (i = 1; i + 2 < meta.n_bins; i++)
         meta.h_bin_ranges[i] = gsl::narrow_cast<std::int32_t>(SYM_RANGE_RATIO
                                                               * meta.table_sizes[i]);
