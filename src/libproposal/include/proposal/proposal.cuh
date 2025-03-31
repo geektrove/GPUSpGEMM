@@ -11,6 +11,7 @@
 #include <proposal/cleanup.cuh>
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
+#include <proposal/num_binning.cuh>
 #include <proposal/setup.cuh>
 #include <proposal/sym.cuh>
 #include <proposal/sym2.cuh>
@@ -49,6 +50,11 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     SPDLOG_DEBUG("Starting symbolic 2 phase");
     sym2(A, B, C, meta, device);
     SPDLOG_DEBUG("Finished symbolic 2 phase");
+
+    // Numeric binning
+    SPDLOG_DEBUG("Starting numeric binning phase");
+    num_binning(C, meta, device);
+    SPDLOG_DEBUG("Finished numeric binning phase");
 
     // Cleanup
     SPDLOG_DEBUG("Starting cleanup phase");
