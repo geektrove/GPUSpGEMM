@@ -46,12 +46,14 @@ __global__ void k_sym_smem_pwarp(
     const auto row_id = tig / SYM_PWARP_SIZE;
     if (row_id >= bin_size)
         return;
-    auto* s_table = s_tables + (static_cast<ptrdiff_t>((tib / SYM_PWARP_SIZE) * table_size));
+    auto* s_table = s_tables
+                    + (static_cast<ptrdiff_t>((tib / SYM_PWARP_SIZE) * table_size));
     auto* s_nnz = s_nnzs + (tib / SYM_PWARP_SIZE);
     const auto row = bins[row_id];
     block.sync();
 
-    for (auto i = a_rpt[row] + (tib % SYM_PWARP_SIZE); i < a_rpt[row + 1]; i += SYM_PWARP_SIZE) {
+    for (auto i = a_rpt[row] + (tib % SYM_PWARP_SIZE); i < a_rpt[row + 1];
+         i += SYM_PWARP_SIZE) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
             const auto key = b_col[k];

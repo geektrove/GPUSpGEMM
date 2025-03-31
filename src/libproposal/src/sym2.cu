@@ -52,7 +52,8 @@ __global__ void k_sym2_smem_pwarp(
     if (row_id >= bin_size)
         return;
 
-    auto* s_table = s_tables + (static_cast<ptrdiff_t>((tib / SYM_PWARP_SIZE) * table_size));
+    auto* s_table = s_tables
+                    + (static_cast<ptrdiff_t>((tib / SYM_PWARP_SIZE) * table_size));
     auto* s_offset = s_offsets + (tib / SYM_PWARP_SIZE);
 
     // Aggregate the column indices in the hash table
