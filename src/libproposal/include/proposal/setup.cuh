@@ -17,6 +17,7 @@
 
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
+#include <proposal/utils.cuh>
 
 namespace cg = cooperative_groups;
 
@@ -277,16 +278,9 @@ void setup(const utils::DeviceCSR<T>& A,
     // Copy the maximum NIP per row in C to the host
     utils::memcpy_async(meta.h_max_row_nnz, C.rpt + C.m, sizeof(std::int32_t));
 
-    // Calculate table sizes and ranges
-    auto calculate_smem_size = [&](std::int32_t n_blocks) {
-        auto smem = device.smem_per_sm;                    // Total SMEM per SM
-        smem -= n_blocks * device.smem_per_block_reserved; // Available SMEM per SM
-        smem /= n_blocks;                                  // SMEM per block
-        smem = std::min(smem, device.max_smem_per_block);  // Max SMEM per block (opt in)
-        return smem;
-    };
+    // Calculate table sizes and ranges for symbolic binning
     auto calculate_sym_table_size = [&](std::int32_t n_blocks, bool round_down = true) {
-        const auto smem = calculate_smem_size(n_blocks);
+        const auto smem = get_smem_size(device, n_blocks);
         auto table_size = smem / sizeof(std::int32_t);
         if (round_down)
             // Round down to the nearest power of 2
