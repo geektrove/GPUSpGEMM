@@ -251,36 +251,41 @@ inline void allocate_host_memory(Meta& meta) {
 }
 
 inline void fill_sizes_for_sym_binning(Meta& meta, const Device& device) {
-    auto calculate_sym_table_size = [&](std::int32_t n_blocks, bool round_down = true) {
-        const auto smem = get_smem_size(device, n_blocks);
-        auto table_size = smem / gsl::narrow_cast<std::int32_t>(sizeof(std::int32_t));
-        if (round_down)
-            // Round down to the nearest power of 2
-            table_size = utils::bitfloor(table_size);
-        return table_size;
-    };
+    auto calculate_sym_table_size =
+        [&](std::int32_t n_blocks, std::int32_t reserved = 0, bool round_down = true) {
+            const auto smem = get_smem_size(device, n_blocks);
+            auto table_size = smem / gsl::narrow_cast<std::int32_t>(sizeof(std::int32_t));
+            table_size -= reserved;
+            if (round_down)
+                // Round down to the nearest power of 2
+                table_size = utils::bitfloor(table_size);
+            return table_size;
+        };
 
     meta.block_sizes[0] = device.optimal_block_size;
-    meta.table_sizes[0] = calculate_sym_table_size(device.max_threads_per_sm
-                                                   / meta.block_sizes[0]);
+    meta.table_sizes[0] = calculate_sym_table_size(
+        device.max_threads_per_sm / meta.block_sizes[0],
+        device.optimal_block_size / PWARP_SIZE);
     meta.block_sizes[1] = device.min_block_size;
     meta.table_sizes[1] = calculate_sym_table_size(device.max_threads_per_sm
-                                                   / meta.block_sizes[1]);
+                                                       / meta.block_sizes[1],
+                                                   1);
     std::int32_t i = 2;
     for (; meta.block_sizes[i - 1] < device.max_threads_per_block; i++) {
         meta.block_sizes[i] = meta.block_sizes[i - 1] * 2;
         meta.table_sizes[i] = calculate_sym_table_size(device.max_threads_per_sm
-                                                       / meta.block_sizes[i]);
+                                                           / meta.block_sizes[i],
+                                                       1);
     }
     for (auto n_blocks = device.max_threads_per_sm / device.max_threads_per_block / 2;
          n_blocks > 0;
          n_blocks /= 2) {
         meta.block_sizes[i] = device.max_threads_per_block;
-        meta.table_sizes[i] = calculate_sym_table_size(n_blocks);
+        meta.table_sizes[i] = calculate_sym_table_size(n_blocks, 1);
         i++;
     }
     meta.block_sizes[meta.n_bins - 2] = device.max_threads_per_block;
-    meta.table_sizes[meta.n_bins - 2] = calculate_sym_table_size(1, false) - 1;
+    meta.table_sizes[meta.n_bins - 2] = calculate_sym_table_size(1, 1, false);
     meta.block_sizes[meta.n_bins - 1] = device.max_threads_per_block;
     meta.table_sizes[meta.n_bins - 1] = std::numeric_limits<std::int32_t>::max();
 
