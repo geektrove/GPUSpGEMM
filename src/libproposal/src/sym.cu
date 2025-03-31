@@ -81,17 +81,19 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
                            const __grid_constant__ std::int32_t* const __restrict__ b_col,
                            const __grid_constant__ std::int32_t* const __restrict__ bins,
                            __grid_constant__ std::int32_t* const __restrict__ nnzs) {
-    extern __shared__ std::int32_t s_table[];
-    __shared__ std::int32_t s_nnz;
+    extern __shared__ std::int32_t smem[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
+    auto* s_table = smem;
+    auto* s_nnz = s_table + table_size;
+
     for (auto i = tib; i < table_size; i += block_size)
         s_table[i] = -1;
-    cg::invoke_one(block, [&] { s_nnz = 0; });
+    cg::invoke_one(block, [&] { *s_nnz = 0; });
     block.sync();
 
     const auto row = bins[grid.block_rank()];
@@ -107,7 +109,7 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
             while (true) {
                 const auto old = atomicCAS_block(s_table + hash, -1, key);
                 if (old == -1) {
-                    atomicAdd_block(&s_nnz, 1);
+                    atomicAdd_block(s_nnz, 1);
                     break;
                 }
                 if (old == key)
@@ -118,7 +120,7 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
     }
     block.sync();
 
-    cg::invoke_one(block, [&] { nnzs[row] = s_nnz; });
+    cg::invoke_one(block, [&] { nnzs[row] = *s_nnz; });
 }
 
 __global__ void k_sym_smem_max(
