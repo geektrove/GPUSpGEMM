@@ -21,7 +21,7 @@ template<std::floating_point T>
 void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
     NVTX3_FUNC_RANGE();
 
-    if (*meta.h_max_row_nnz <= meta.h_sym_bin_ranges[0]) {
+    if (*meta.h_max_row_nnz <= meta.h_bin_ranges[0]) {
         // If all rows fall into the smallest bin, we can skip the binning process
         // and directly assign the row indices to the smallest bin
         small_binning(C.m, meta);
@@ -36,7 +36,7 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
                          device.optimal_block_size,
                          meta.n_bins * sizeof(std::int32_t),
                          cudaStreamDefault,
-                         meta.d_sym_bin_ranges,
+                         meta.d_bin_ranges,
                          meta.n_bins,
                          C.rpt,
                          C.m,
@@ -62,7 +62,7 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
                          device.optimal_block_size,
                          2 * meta.n_bins * sizeof(std::int32_t),
                          cudaStreamDefault,
-                         meta.d_sym_bin_ranges,
+                         meta.d_bin_ranges,
                          meta.n_bins,
                          C.rpt,
                          C.m,

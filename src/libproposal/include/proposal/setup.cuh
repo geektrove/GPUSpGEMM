@@ -252,8 +252,8 @@ void setup(const utils::DeviceCSR<T>& A,
                            + meta.cub_storage_size;
     meta.d_ptr = utils::malloc_async(d_memsize, meta.streams[0]);
     meta.d_bins = static_cast<std::int32_t*>(meta.d_ptr);
-    meta.d_sym_bin_ranges = meta.d_bins + C.m;
-    meta.d_bin_sizes = meta.d_sym_bin_ranges + meta.n_bins;
+    meta.d_bin_ranges = meta.d_bins + C.m;
+    meta.d_bin_sizes = meta.d_bin_ranges + meta.n_bins;
     meta.d_bin_offsets = meta.d_bin_sizes + meta.n_bins;
     meta.d_max_row_nnz = meta.d_bin_offsets + meta.n_bins;
     meta.d_total_nnz = meta.d_max_row_nnz + 1;
@@ -265,10 +265,10 @@ void setup(const utils::DeviceCSR<T>& A,
     // Allocate host memory
     const auto h_memsize = (5 * meta.n_bins + 2) * sizeof(std::int32_t);
     meta.h_ptr = utils::malloc<utils::Location::Host>(h_memsize);
-    meta.sym_block_sizes = static_cast<std::int32_t*>(meta.h_ptr);
-    meta.sym_table_sizes = meta.sym_block_sizes + meta.n_bins;
-    meta.h_sym_bin_ranges = meta.sym_table_sizes + meta.n_bins;
-    meta.h_bin_sizes = meta.h_sym_bin_ranges + meta.n_bins;
+    meta.block_sizes = static_cast<std::int32_t*>(meta.h_ptr);
+    meta.table_sizes = meta.block_sizes + meta.n_bins;
+    meta.h_bin_ranges = meta.table_sizes + meta.n_bins;
+    meta.h_bin_sizes = meta.h_bin_ranges + meta.n_bins;
     meta.h_bin_offsets = meta.h_bin_sizes + meta.n_bins;
     meta.h_max_row_nnz = meta.h_bin_offsets + meta.n_bins;
     meta.h_total_nnz = meta.h_max_row_nnz + 1;
@@ -288,36 +288,36 @@ void setup(const utils::DeviceCSR<T>& A,
         return table_size;
     };
 
-    meta.sym_block_sizes[0] = device.optimal_block_size;
-    meta.sym_table_sizes[0] = calculate_sym_table_size(device.max_threads_per_sm
-                                                       / meta.sym_block_sizes[0]);
-    meta.sym_block_sizes[1] = device.min_block_size;
-    meta.sym_table_sizes[1] = calculate_sym_table_size(device.max_threads_per_sm
-                                                       / meta.sym_block_sizes[1]);
+    meta.block_sizes[0] = device.optimal_block_size;
+    meta.table_sizes[0] = calculate_sym_table_size(device.max_threads_per_sm
+                                                   / meta.block_sizes[0]);
+    meta.block_sizes[1] = device.min_block_size;
+    meta.table_sizes[1] = calculate_sym_table_size(device.max_threads_per_sm
+                                                   / meta.block_sizes[1]);
     std::int32_t i = 2;
-    for (; meta.sym_block_sizes[i - 1] < device.max_threads_per_block; i++) {
-        meta.sym_block_sizes[i] = meta.sym_block_sizes[i - 1] * 2;
-        meta.sym_table_sizes[i] = calculate_sym_table_size(device.max_threads_per_sm
-                                                           / meta.sym_block_sizes[i]);
+    for (; meta.block_sizes[i - 1] < device.max_threads_per_block; i++) {
+        meta.block_sizes[i] = meta.block_sizes[i - 1] * 2;
+        meta.table_sizes[i] = calculate_sym_table_size(device.max_threads_per_sm
+                                                       / meta.block_sizes[i]);
     }
     for (auto n_blocks = device.max_threads_per_sm / device.max_threads_per_block / 2;
          n_blocks > 0;
          n_blocks /= 2) {
-        meta.sym_block_sizes[i] = device.max_threads_per_block;
-        meta.sym_table_sizes[i] = calculate_sym_table_size(n_blocks);
+        meta.block_sizes[i] = device.max_threads_per_block;
+        meta.table_sizes[i] = calculate_sym_table_size(n_blocks);
         i++;
     }
-    meta.sym_block_sizes[meta.n_bins - 1] = device.max_threads_per_block;
-    meta.sym_table_sizes[meta.n_bins - 1] = calculate_sym_table_size(1, false) - 1;
+    meta.block_sizes[meta.n_bins - 1] = device.max_threads_per_block;
+    meta.table_sizes[meta.n_bins - 1] = calculate_sym_table_size(1, false) - 1;
 
-    meta.h_sym_bin_ranges[0] = gsl::narrow_cast<std::int32_t>(
+    meta.h_bin_ranges[0] = gsl::narrow_cast<std::int32_t>(
         SYM_RANGE_RATIO
-        * gsl::narrow_cast<double>(meta.sym_table_sizes[0]
-                                   / (meta.sym_block_sizes[0] / PWARP_SIZE)));
+        * gsl::narrow_cast<double>(meta.table_sizes[0]
+                                   / (meta.block_sizes[0] / PWARP_SIZE)));
     for (i = 1; i + 1 < meta.n_bins; i++)
-        meta.h_sym_bin_ranges[i] = gsl::narrow_cast<std::int32_t>(
-            SYM_RANGE_RATIO * meta.sym_table_sizes[i]);
-    meta.h_sym_bin_ranges[meta.n_bins - 1] = std::numeric_limits<std::int32_t>::max();
+        meta.h_bin_ranges[i] = gsl::narrow_cast<std::int32_t>(SYM_RANGE_RATIO
+                                                              * meta.table_sizes[i]);
+    meta.h_bin_ranges[meta.n_bins - 1] = std::numeric_limits<std::int32_t>::max();
 
     SPDLOG_DEBUG("{:>12s} {:>12s} {:>12s} {:>12s}",
                  "Bin",
@@ -327,14 +327,14 @@ void setup(const utils::DeviceCSR<T>& A,
     for (i = 0; i < meta.n_bins; i++) {
         SPDLOG_DEBUG("{:12d} {:12d} {:12d} {:12d}",
                      i,
-                     meta.sym_block_sizes[i],
-                     meta.sym_table_sizes[i],
-                     meta.h_sym_bin_ranges[i]);
+                     meta.block_sizes[i],
+                     meta.table_sizes[i],
+                     meta.h_bin_ranges[i]);
     }
 
     // Copy the symbolic bin ranges to the device
-    utils::memcpy_async(meta.d_sym_bin_ranges,
-                        meta.h_sym_bin_ranges,
+    utils::memcpy_async(meta.d_bin_ranges,
+                        meta.h_bin_ranges,
                         meta.n_bins * sizeof(std::int32_t),
                         meta.streams[0]);
 
