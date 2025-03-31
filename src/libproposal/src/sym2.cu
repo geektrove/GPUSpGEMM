@@ -123,7 +123,7 @@ __global__ void k_sym2_smem(
 
     // Aggregate the column indices in the hash table
     const auto row = bins[grid.block_rank()];
-    const auto i_offset = (tib % block_size) / WARP_SIZE;
+    const auto i_offset = tib / WARP_SIZE;
     const auto i_step = block_size / WARP_SIZE;
     const auto k_offset = tib % WARP_SIZE;
     const auto k_step = WARP_SIZE;
@@ -192,7 +192,7 @@ __global__ void k_sym2_smem_max(
 
     // Aggregate the column indices in the hash table
     const auto row = bins[grid.block_rank()];
-    const auto i_offset = (tib % block_size) / WARP_SIZE;
+    const auto i_offset = tib / WARP_SIZE;
     const auto i_step = block_size / WARP_SIZE;
     const auto k_offset = tib % WARP_SIZE;
     const auto k_step = WARP_SIZE;

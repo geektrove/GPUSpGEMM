@@ -99,7 +99,7 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
     block.sync();
 
     const auto row = bins[grid.block_rank()];
-    const auto i_offset = (tib % block_size) / WARP_SIZE;
+    const auto i_offset = tib / WARP_SIZE;
     const auto i_step = block_size / WARP_SIZE;
     const auto k_offset = tib % WARP_SIZE;
     const auto k_step = WARP_SIZE;
