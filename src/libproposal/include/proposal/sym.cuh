@@ -65,7 +65,7 @@ void sym(const utils::DeviceCSR<T>& A,
         sizeof(std::int32_t));
 
     // Handle the largest bin first as it may fail to fit in the shared memory
-    const auto last_bin_idx = meta.n_bins - 1;
+    const auto last_bin_idx = meta.n_bins - 2;
     const auto last_bin_size = meta.h_bin_sizes[last_bin_idx];
     std::int32_t h_fail_bin_size{};
     std::int32_t* d_fail_bin{};
@@ -122,8 +122,8 @@ void sym(const utils::DeviceCSR<T>& A,
     utils::handle_cuda_error(
         cudaFuncSetAttribute(k_sym_smem,
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
-                             meta.table_sizes[meta.n_bins - 2] * IdxByteSize));
-    for (std::int32_t i = meta.n_bins - 2; i > 0; i--) {
+                             meta.table_sizes[meta.n_bins - 3] * IdxByteSize));
+    for (std::int32_t i = meta.n_bins - 3; i > 0; i--) {
         SPDLOG_DEBUG("Sym: bin {} size is {}", i, meta.h_bin_sizes[i]);
         if (meta.h_bin_sizes[i] > 0) {
             utils::launch_kernel(k_sym_smem,
@@ -191,7 +191,7 @@ void sym(const utils::DeviceCSR<T>& A,
     }
 
     // Wait for all bins to finish
-    for (std::int32_t i = 0; i < meta.n_bins; i++)
+    for (std::int32_t i = 0; i + 1 < meta.n_bins; i++)
         utils::stream_sync(meta.streams[i]);
 
     // No need to wait for the fail bin deallocation

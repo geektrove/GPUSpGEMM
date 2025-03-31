@@ -178,15 +178,16 @@ void h_compute_nip(const utils::DeviceCSR<T>& A,
 }
 
 inline void fill_n_bins(Meta& meta, const Device& device) {
-    // First bin (PWARP) and last bin (max SMEM) are always present
-    meta.n_bins = 2;
+    // +1 PWARP bin
+    // +1 Max SMEM bin
+    // +1 Global memory bin used in sym2 and num stages
+    meta.n_bins = 3;
 
-    // Add one bin for each power of 2 block size
-    // [MIN_BLOCK_SIZE, MAX_THREADS_PER_BLOCK]
-    meta.n_bins += utils::ilog2(device.max_threads_per_block / device.min_block_size) + 1;
-
-    // Add one bin for each power of 2 table size with MAX_THREADS_PER_BLOCK
-    meta.n_bins += utils::ilog2(device.max_threads_per_sm / device.max_threads_per_block);
+    // Add one bin for each power of 2 block size in the range
+    // [MIN_BLOCK_SIZE, MAX_THREADS_PER_SM]
+    // Note that from MAX_THREADS_PER_BLOCK to MAX_THREADS_PER_SM
+    // the shared memory size is scaled rather than the number of threads
+    meta.n_bins += utils::ilog2(device.max_threads_per_sm / device.min_block_size) + 1;
 
     SPDLOG_DEBUG("Number of bins: {}", meta.n_bins);
 }
@@ -253,10 +254,10 @@ inline void allocate_host_memory(Meta& meta) {
 inline void fill_sizes_for_sym_binning(Meta& meta, const Device& device) {
     auto calculate_sym_table_size = [&](std::int32_t n_blocks, bool round_down = true) {
         const auto smem = get_smem_size(device, n_blocks);
-        auto table_size = smem / sizeof(std::int32_t);
+        auto table_size = smem / gsl::narrow_cast<std::int32_t>(sizeof(std::int32_t));
         if (round_down)
             // Round down to the nearest power of 2
-            table_size = std::bit_floor(table_size);
+            table_size = utils::bitfloor(table_size);
         return table_size;
     };
 
@@ -279,18 +280,23 @@ inline void fill_sizes_for_sym_binning(Meta& meta, const Device& device) {
         meta.table_sizes[i] = calculate_sym_table_size(n_blocks);
         i++;
     }
+    meta.block_sizes[meta.n_bins - 2] = device.max_threads_per_block;
+    meta.table_sizes[meta.n_bins - 2] = calculate_sym_table_size(1, false) - 1;
     meta.block_sizes[meta.n_bins - 1] = device.max_threads_per_block;
-    meta.table_sizes[meta.n_bins - 1] = calculate_sym_table_size(1, false) - 1;
+    meta.table_sizes[meta.n_bins - 1] = std::numeric_limits<std::int32_t>::max();
 
     meta.h_bin_ranges[0] = gsl::narrow_cast<std::int32_t>(
         SYM_RANGE_RATIO
         * gsl::narrow_cast<double>(meta.table_sizes[0]
                                    / (meta.block_sizes[0] / PWARP_SIZE)));
-    for (i = 1; i + 1 < meta.n_bins; i++)
+    for (i = 1; i + 2 < meta.n_bins; i++)
         meta.h_bin_ranges[i] = gsl::narrow_cast<std::int32_t>(SYM_RANGE_RATIO
                                                               * meta.table_sizes[i]);
+    meta.h_bin_ranges[meta.n_bins - 2] = std::numeric_limits<std::int32_t>::max();
     meta.h_bin_ranges[meta.n_bins - 1] = std::numeric_limits<std::int32_t>::max();
 
+    SPDLOG_DEBUG("Symbolic bins");
+    SPDLOG_DEBUG("* Last bin is unused during symbolic phase");
     SPDLOG_DEBUG("{:>12s} {:>12s} {:>12s} {:>12s}",
                  "Bin",
                  "Block size",
