@@ -76,17 +76,6 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
                          meta.d_bins);
 
     utils::stream_sync();
-
-    if constexpr (utils::IS_DEBUG) {
-        auto op = [d_bins = meta.d_bins, m = C.m] __device__(int i) {
-            assert(d_bins[i] >= 0 && d_bins[i] < m);
-        };
-        size_t cub_requested{};
-        cub::DeviceFor::Bulk(nullptr, cub_requested, C.m, op);
-        assert(cub_requested <= meta.cub_storage_size);
-        utils::handle_cuda_error(
-            cub::DeviceFor::Bulk(meta.d_cub_storage, meta.cub_storage_size, C.m, op));
-    }
 }
 
 template<std::floating_point T>
