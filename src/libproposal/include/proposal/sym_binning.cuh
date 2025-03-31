@@ -53,6 +53,12 @@ void sym_binning(utils::DeviceCSR<T>& C, Meta& meta, const Device& device) {
     for (int i = 0; i + 1 < meta.n_bins; i++)
         meta.h_bin_offsets[i + 1] = meta.h_bin_offsets[i] + meta.h_bin_sizes[i];
 
+    SPDLOG_DEBUG("Symbolic bin sizes");
+    SPDLOG_DEBUG("{:>12s} {:>12s}", "Bin", "Size");
+    for (std::int32_t i = 0; i < meta.n_bins; i++) {
+        SPDLOG_DEBUG("{:12d} {:12d}", i, meta.h_bin_sizes[i]);
+    }
+
     utils::memcpy_async(meta.d_bin_offsets,
                         meta.h_bin_offsets,
                         meta.n_bins * sizeof(std::int32_t));
