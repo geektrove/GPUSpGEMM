@@ -11,11 +11,10 @@
 
 #include <utils/utils.cuh>
 
+#include <proposal/definitions.cuh>
 #include <proposal/sym2.cuh>
 
 namespace cg = cooperative_groups;
-
-inline constexpr std::int32_t HASH_SCALE = 107;
 
 __global__ void k_sym2_smem_pwarp(
     const __grid_constant__ std::int32_t table_size,

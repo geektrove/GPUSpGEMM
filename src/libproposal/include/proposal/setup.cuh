@@ -14,6 +14,7 @@
 
 #include <utils/utils.cuh>
 
+#include <proposal/definitions.cuh>
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 #include <proposal/utils.cuh>
