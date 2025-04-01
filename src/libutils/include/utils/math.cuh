@@ -21,6 +21,7 @@ constexpr auto ispow2(T a) -> bool {
 
 constexpr auto modpow2(std::integral auto a, std::integral auto b) {
     assert(b > 0);
+    assert(ispow2(b));
     if (b <= 0)
         __builtin_unreachable();
     return a & (b - 1);
@@ -28,6 +29,7 @@ constexpr auto modpow2(std::integral auto a, std::integral auto b) {
 
 constexpr auto divpow2(std::integral auto a, std::integral auto b) {
     assert(b > 0);
+    assert(ispow2(b));
     if (b <= 0)
         __builtin_unreachable();
     return a >> ilog2(b);
