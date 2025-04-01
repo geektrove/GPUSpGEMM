@@ -81,6 +81,47 @@ __global__ void k_compute_nip(
     cg::reduce_update_async(tile, max_nip_ref, l_nip, cg::greater<std::int32_t>{});
 }
 
+template<std::floating_point T>
+void h_compute_nip(const utils::DeviceCSR<T>& A,
+                   const utils::DeviceCSR<T>& B,
+                   utils::DeviceCSR<T>& C,
+                   const Device& device) {
+    static constexpr std::int32_t BLOCK512 = 512;
+    static constexpr std::int32_t BLOCK1024 = 1024;
+
+    // Realistically only 512 and 1024 block sizes are optimal
+    // starting from compute capability 1.2, but in any other case,
+    // we can use 1024 threads per block as a fallback
+    switch (device.optimal_block_size) {
+    case BLOCK512:
+        utils::launch_kernel(k_compute_nip<BLOCK512>,
+                             cuda::ceil_div(C.m, BLOCK512),
+                             BLOCK512,
+                             0,
+                             cudaStreamDefault,
+                             A.rpt,
+                             A.col,
+                             B.rpt,
+                             C.m,
+                             C.rpt,
+                             C.rpt + C.m);
+        break;
+    default:
+        utils::launch_kernel(k_compute_nip<BLOCK1024>,
+                             cuda::ceil_div(C.m, BLOCK1024),
+                             BLOCK1024,
+                             0,
+                             cudaStreamDefault,
+                             A.rpt,
+                             A.col,
+                             B.rpt,
+                             C.m,
+                             C.rpt,
+                             C.rpt + C.m);
+        break;
+    }
+}
+
 inline void fill_device_properties(Device& device) {
     // Get current device ID
     int id{};
@@ -133,47 +174,6 @@ inline void fill_device_properties(Device& device) {
     SPDLOG_DEBUG("Shared memory per block (max opt in): {}", device.max_smem_per_block);
     SPDLOG_DEBUG("Optimal block size: {}", device.optimal_block_size);
     SPDLOG_DEBUG("Minimum block size: {}", device.min_block_size);
-}
-
-template<std::floating_point T>
-void h_compute_nip(const utils::DeviceCSR<T>& A,
-                   const utils::DeviceCSR<T>& B,
-                   utils::DeviceCSR<T>& C,
-                   const Device& device) {
-    static constexpr std::int32_t BLOCK512 = 512;
-    static constexpr std::int32_t BLOCK1024 = 1024;
-
-    // Realistically only 512 and 1024 block sizes are optimal
-    // starting from compute capability 1.2, but in any other case,
-    // we can use 1024 threads per block as a fallback
-    switch (device.optimal_block_size) {
-    case BLOCK512:
-        utils::launch_kernel(k_compute_nip<BLOCK512>,
-                             cuda::ceil_div(C.m, BLOCK512),
-                             BLOCK512,
-                             0,
-                             cudaStreamDefault,
-                             A.rpt,
-                             A.col,
-                             B.rpt,
-                             C.m,
-                             C.rpt,
-                             C.rpt + C.m);
-        break;
-    default:
-        utils::launch_kernel(k_compute_nip<BLOCK1024>,
-                             cuda::ceil_div(C.m, BLOCK1024),
-                             BLOCK1024,
-                             0,
-                             cudaStreamDefault,
-                             A.rpt,
-                             A.col,
-                             B.rpt,
-                             C.m,
-                             C.rpt,
-                             C.rpt + C.m);
-        break;
-    }
 }
 
 inline void fill_n_bins(Meta& meta, const Device& device) {
