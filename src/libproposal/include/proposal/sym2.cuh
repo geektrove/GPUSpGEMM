@@ -170,8 +170,13 @@ void sym2(const utils::DeviceCSR<T>& A,
     auto calculate_num_table_size = [&](std::int32_t n_blocks) {
         static constexpr auto ItemByteSize = gsl::narrow_cast<std::int32_t>(
             sizeof(std::int32_t) + sizeof(T));
-        const auto smem = get_smem_size(device, n_blocks);
+        // Align column indices to 16 bytes to allow hardware accelerated
+        // async copy from global to shared memory
+        static constexpr std::int32_t SMEM_ALIGNMENT = 16;
+        static constexpr auto SMEM_ITEM_ALIGNMENT = SMEM_ALIGNMENT / sizeof(T);
+        auto smem = get_smem_size(device, n_blocks);
         auto table_size = smem / ItemByteSize;
+        table_size = (table_size / SMEM_ITEM_ALIGNMENT) * SMEM_ITEM_ALIGNMENT;
         return table_size;
     };
 
