@@ -31,7 +31,7 @@ __global__ void k_sym2_smem_pwarp(
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
+    const auto tile = cg::tiled_partition<SYM_PWARP_SIZE>(block);
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto tip = tib % SYM_PWARP_SIZE;
@@ -72,17 +72,17 @@ __global__ void k_sym2_smem_pwarp(
             }
         }
     }
-    warp.sync();
+    tile.sync();
 
     // Condense the column indices
     for (auto offset = 0; offset < table_size; offset += SYM_PWARP_SIZE) {
         const auto i = offset + tip;
         const auto col = i < table_size ? s_table[i] : -1;
-        warp.sync();
+        tile.sync();
         if (col != -1)
             s_table[atomicAdd_block(s_offset, 1)] = col;
     }
-    warp.sync();
+    tile.sync();
 
     // Write the column indices to the output
     const auto c_offset = c_rpt[row];

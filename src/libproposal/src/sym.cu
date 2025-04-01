@@ -30,31 +30,31 @@ __global__ void k_sym_smem_pwarp(
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto& tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
-    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
-    const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
+    const auto tile = cg::tiled_partition<SYM_PWARP_SIZE>(block);
+    const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto tip = tib % SYM_PWARP_SIZE;
+    const auto pib = tib / SYM_PWARP_SIZE;
+    const auto block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
     const auto rows_per_block = block_size / SYM_PWARP_SIZE;
     const auto total_table_size = table_size * rows_per_block;
 
     auto* s_tables = reinterpret_cast<std::int32_t*>(smem);
-    auto* s_nnzs = s_tables + total_table_size;
 
     for (auto i = tib; i < total_table_size; i += block_size)
         s_tables[i] = -1;
-    if (tib < rows_per_block)
-        s_nnzs[tib] = 0;
+    block.sync();
+
     const auto row_id = tig / SYM_PWARP_SIZE;
     if (row_id >= bin_size)
         return;
-    auto* s_table = s_tables
-                    + (static_cast<ptrdiff_t>((tib / SYM_PWARP_SIZE) * table_size));
-    auto* s_nnz = s_nnzs + (tib / SYM_PWARP_SIZE);
-    const auto row = bins[row_id];
-    block.sync();
 
-    for (auto i = a_rpt[row] + (tib % SYM_PWARP_SIZE); i < a_rpt[row + 1];
-         i += SYM_PWARP_SIZE) {
+    auto* s_table = s_tables + (static_cast<ptrdiff_t>(pib * table_size));
+    const auto row = bins[row_id];
+
+    auto l_nnz = 0;
+    for (auto i = a_rpt[row] + tip; i < a_rpt[row + 1]; i += SYM_PWARP_SIZE) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
             const auto key = b_col[k];
@@ -62,7 +62,7 @@ __global__ void k_sym_smem_pwarp(
             while (true) {
                 const auto old = atomicCAS_block(s_table + hash, -1, key);
                 if (old == -1) {
-                    atomicAdd_block(s_nnz, 1);
+                    l_nnz++;
                     break;
                 }
                 if (old == key)
@@ -71,10 +71,10 @@ __global__ void k_sym_smem_pwarp(
             }
         }
     }
-    block.sync();
+    tile.sync();
 
-    if (tib % SYM_PWARP_SIZE == 0)
-        nnzs[row] = *s_nnz;
+    const auto sum_nnz = cg::reduce(tile, l_nnz, cg::plus<std::int32_t>{});
+    cg::invoke_one(tile, [&] { nnzs[row] = sum_nnz; });
 }
 
 __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
