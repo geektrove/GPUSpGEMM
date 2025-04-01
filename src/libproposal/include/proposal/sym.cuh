@@ -57,8 +57,7 @@ template<std::floating_point T>
 void sym(const utils::DeviceCSR<T>& A,
          const utils::DeviceCSR<T>& B,
          utils::DeviceCSR<T>& C,
-         Meta& meta,
-         const Device& device) {
+         Meta& meta) {
     NVTX3_FUNC_RANGE();
 
     static constexpr auto IdxByteSize = gsl::narrow_cast<std::int32_t>(
