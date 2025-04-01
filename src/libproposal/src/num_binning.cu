@@ -8,21 +8,6 @@
 
 namespace cg = cooperative_groups;
 
-namespace {
-
-__forceinline__ __device__ auto find_bin(const std::int32_t* const __restrict__ ranges,
-                                         const std::int32_t n_bins,
-                                         const std::int32_t x) -> std::int32_t {
-    for (std::int32_t i = 0; i < n_bins; i++) {
-        if (x <= ranges[i])
-            return i;
-    }
-    assert(false);
-    __builtin_unreachable();
-}
-
-} // namespace
-
 __global__ void k_num_binning1(
     const __grid_constant__ std::int32_t* const __restrict__ ranges,
     const __grid_constant__ std::int32_t n_bins,
