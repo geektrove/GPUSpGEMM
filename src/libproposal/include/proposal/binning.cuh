@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cuda/std/concepts>
 #include <cuda/std/cstddef>
+#include <cuda/std/functional>
 
 #include <cooperative_groups.h>
 #include <cub/cub.cuh>
@@ -14,84 +15,81 @@
 
 #include <utils/utils.cuh>
 
-#include <proposal/definitions.cuh>
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
+#include <proposal/parameters.cuh>
 
 namespace cg = cooperative_groups;
 
-__forceinline__ __device__ auto find_bin(const std::int32_t* const __restrict__ ranges,
-                                         const std::int32_t n_bins,
-                                         const std::int32_t x) -> std::int32_t {
-    for (std::int32_t i = 0; i < n_bins; i++) {
-        if (x <= ranges[i])
+template<auto RANGES>
+__forceinline__ __device__ auto find_bin(const std::int32_t x) -> std::int32_t {
+    static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
+    for (std::int32_t i = 0; i < N_BINS; i++) {
+        if (x <= RANGES[i])
             return i;
     }
     assert(false);
     __builtin_unreachable();
 }
 
-template<typename GetValueF>
-__global__ void k_binning1(
-    const __grid_constant__ std::int32_t* const __restrict__ ranges,
-    const __grid_constant__ std::int32_t n_bins,
-    const __grid_constant__ std::int32_t m,
-    __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
-    GetValueF get_value) {
-    extern __shared__ cuda::std::byte smem[];
+template<BinningType BinType, typename GetValueF>
+__global__ void k_binning1(const __grid_constant__ std::int32_t m,
+                           __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
+                           GetValueF get_value) {
+    static constexpr auto RANGES = get_ranges<BinType>();
+    static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
 
-    auto* s_bin_sizes = reinterpret_cast<std::int32_t*>(smem);
+    __shared__ std::int32_t s_bin_sizes[N_BINS];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
-    if (tib < n_bins)
+    if (tib < N_BINS)
         s_bin_sizes[tib] = 0;
     block.sync();
 
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     if (row < m) {
-        const auto bin_idx = find_bin(ranges, n_bins, get_value(row));
+        const auto bin_idx = find_bin<RANGES>(get_value(row));
         atomicAdd_block(s_bin_sizes + bin_idx, 1);
     }
     block.sync();
 
-    if (tib < n_bins)
+    if (tib < N_BINS)
         atomicAdd(bin_sizes + tib, s_bin_sizes[tib]);
 }
 
-template<typename GetValueF>
+template<BinningType BinType, typename GetValueF>
 __global__ void k_binning2(
-    const __grid_constant__ std::int32_t* const __restrict__ ranges,
-    const __grid_constant__ std::int32_t n_bins,
     const __grid_constant__ std::int32_t m,
     const __grid_constant__ std::int32_t* const __restrict__ bin_offsets,
     __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
     __grid_constant__ std::int32_t* const __restrict__ bins,
     GetValueF get_value) {
-    extern __shared__ cuda::std::byte smem[];
+    static constexpr auto RANGES = get_ranges<BinType>();
+    static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
 
-    auto* s_bin_sizes = reinterpret_cast<std::int32_t*>(smem);
-    auto* s_bin_offsets = s_bin_sizes + n_bins;
+    __shared__ std::int32_t s_bin_sizes[N_BINS];
+    __shared__ std::int32_t s_bin_offsets[N_BINS];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
-    if (tib < n_bins)
+    if (tib < N_BINS)
         s_bin_sizes[tib] = 0;
     block.sync();
 
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     std::int32_t bin_idx = 0;
     if (row < m) {
-        bin_idx = find_bin(ranges, n_bins, get_value(row));
+        bin_idx = find_bin<RANGES>(get_value(row));
         atomicAdd_block(s_bin_sizes + bin_idx, 1);
     }
     block.sync();
 
-    if (tib < n_bins) {
+    if (tib < N_BINS) {
         s_bin_offsets[tib] = atomicAdd(bin_sizes + tib, s_bin_sizes[tib]);
         s_bin_offsets[tib] += bin_offsets[tib];
         s_bin_sizes[tib] = 0;
@@ -104,82 +102,77 @@ __global__ void k_binning2(
     }
 }
 
-inline void small_binning(const std::int32_t m, Meta& meta) {
-    auto op = [d_bins = meta.d_bins] __device__(int i) {
-        d_bins[i] = static_cast<std::int32_t>(i);
-    };
-
+template<typename Params, std::int32_t N_BINS>
+inline void small_binning(const std::int32_t m, Meta<Params>& meta) {
     // Perform iota operation to fill the smallest bin with row indices
     utils::handle_cuda_error(
-        cub::DeviceFor::Bulk(meta.d_cub_storage, meta.cub_storage_size, m, op));
+        cub::DeviceFor::Bulk(meta.d_cub_storage,
+                             meta.cub_storage_size,
+                             m,
+                             [d_bins = meta.d_bins] __device__(int i) {
+                                 d_bins[i] = gsl::narrow_cast<std::int32_t>(i);
+                             }));
 
     // Set bin sizes and offsets
     meta.h_bin_sizes[0] = m;
-    for (int i = 1; i < meta.n_bins; i++)
+    for (int i = 1; i < N_BINS; i++)
         meta.h_bin_sizes[i] = 0;
     meta.h_bin_offsets[0] = 0;
-    for (int i = 1; i < meta.n_bins; i++)
+    for (int i = 1; i < N_BINS; i++)
         meta.h_bin_offsets[i] = m;
 
     utils::stream_sync();
 }
 
-template<std::floating_point T, typename GetValueF>
-void binning(utils::DeviceCSR<T>& C,
-             Meta& meta,
-             const Device& device,
-             GetValueF get_value) {
+template<std::floating_point T, typename Params, BinningType BinType, typename GetValueF>
+void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     NVTX3_FUNC_RANGE();
 
-    if (*meta.h_max_row_nnz <= meta.h_bin_ranges[0]) {
+    static constexpr auto RANGES = get_ranges<Params, BinType>();
+    static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
+
+    if (meta.h_max_row_nnz <= RANGES[0]) {
         // If all rows fall into the smallest bin, we can skip the binning process
         // and directly assign the row indices to the smallest bin
-        small_binning(C.m, meta);
+        small_binning<Params, N_BINS>(C.m, meta);
         return;
     }
 
     // Perform full two-stage symbolic binning
-    utils::memset_async(meta.d_bin_sizes, 0, meta.n_bins * sizeof(std::int32_t));
-
-    utils::launch_kernel(k_binning1<GetValueF>,
-                         cuda::ceil_div(C.m, device.optimal_block_size),
-                         device.optimal_block_size,
-                         meta.n_bins * sizeof(std::int32_t),
+    utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t));
+    utils::launch_kernel(k_binning1<BinType, GetValueF>,
+                         cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
+                         Params::OPTIMAL_BLOCK_SIZE,
+                         0,
                          cudaStreamDefault,
-                         meta.d_bin_ranges,
-                         meta.n_bins,
                          C.m,
                          meta.d_bin_sizes,
                          get_value);
-
     utils::memcpy_async(meta.h_bin_sizes,
                         meta.d_bin_sizes,
-                        meta.n_bins * sizeof(std::int32_t));
+                        N_BINS * sizeof(std::int32_t));
     utils::event_record(meta.events[0]);
-    utils::memset_async(meta.d_bin_sizes, 0, meta.n_bins * sizeof(std::int32_t));
-
+    utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t));
     utils::event_sync(meta.events[0]);
+
     meta.h_bin_offsets[0] = 0;
-    for (int i = 0; i + 1 < meta.n_bins; i++)
+    for (int i = 0; i + 1 < N_BINS; i++)
         meta.h_bin_offsets[i + 1] = meta.h_bin_offsets[i] + meta.h_bin_sizes[i];
 
     SPDLOG_DEBUG("Bin sizes");
     SPDLOG_DEBUG("{:>12s} {:>12s}", "Bin", "Size");
-    for (std::int32_t i = 0; i < meta.n_bins; i++) {
+    for (std::int32_t i = 0; i < N_BINS; i++) {
         SPDLOG_DEBUG("{:12d} {:12d}", i, meta.h_bin_sizes[i]);
     }
 
     utils::memcpy_async(meta.d_bin_offsets,
                         meta.h_bin_offsets,
-                        meta.n_bins * sizeof(std::int32_t));
-
-    utils::launch_kernel(k_binning2<GetValueF>,
-                         cuda::ceil_div(C.m, device.optimal_block_size),
-                         device.optimal_block_size,
-                         2 * meta.n_bins * sizeof(std::int32_t),
+                        N_BINS * sizeof(std::int32_t));
+    utils::launch_kernel(k_binning2<BinType, GetValueF>,
+                         cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
+                         Params::OPTIMAL_BLOCK_SIZE,
+                         0,
                          cudaStreamDefault,
-                         meta.d_bin_ranges,
-                         meta.n_bins,
                          C.m,
                          meta.d_bin_offsets,
                          meta.d_bin_sizes,
@@ -189,11 +182,8 @@ void binning(utils::DeviceCSR<T>& C,
     utils::stream_sync();
 }
 
-template<std::floating_point T, typename GetValueF>
-void sym_binning2(utils::DeviceCSR<T>& C,
-                  Meta& meta,
-                  const Device& device,
-                  GetValueF get_value) {
+template<std::floating_point T, typename Params, typename GetValueF>
+void sym_binning2(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     NVTX3_FUNC_RANGE();
 
     // Calculate max NNZ per row
@@ -211,40 +201,21 @@ void sym_binning2(utils::DeviceCSR<T>& C,
                                                            C.m + 1));
 
     // Copy max and total NNZ to host
-    utils::memcpy_async(meta.h_max_row_nnz,
+    utils::memcpy_async(&meta.h_max_row_nnz,
                         meta.d_max_row_nnz,
-                        sizeof(*meta.h_max_row_nnz));
-    utils::memcpy_async(meta.h_total_nnz, C.rpt + C.m, sizeof(*meta.h_total_nnz));
-
-    // Update the table sizes for the global memory bin
-    meta.table_sizes[meta.n_bins - 1] = gsl::narrow_cast<std::int32_t>(*meta.h_max_row_nnz
-                                                                       / SYM_RANGE_RATIO);
-    SPDLOG_DEBUG("Symbolic 2 bins");
-    SPDLOG_DEBUG("{:>12s} {:>12s} {:>12s} {:>12s}",
-                 "Bin",
-                 "Block size",
-                 "Table size",
-                 "Range");
-    for (std::int32_t i = 0; i < meta.n_bins; i++) {
-        SPDLOG_DEBUG("{:12d} {:12d} {:12d} {:12d}",
-                     i,
-                     meta.block_sizes[i],
-                     meta.table_sizes[i],
-                     meta.h_bin_ranges[i]);
-    }
-
-    // Wait for max and total NNZ
+                        sizeof(meta.h_max_row_nnz));
+    utils::memcpy_async(&meta.h_total_nnz, C.rpt + C.m, sizeof(meta.h_total_nnz));
     utils::stream_sync();
-    SPDLOG_DEBUG("Max NNZ per row is {}", *meta.h_max_row_nnz);
-    SPDLOG_DEBUG("Total NNZ in C is {}", *meta.h_total_nnz);
+    SPDLOG_DEBUG("Max NNZ per row is {}", meta.h_max_row_nnz);
+    SPDLOG_DEBUG("Total NNZ in C is {}", meta.h_total_nnz);
 
     // Allocate C.col
-    C.nnz = *meta.h_total_nnz;
+    C.nnz = meta.h_total_nnz;
     auto* col_ptr = utils::malloc_async(C.nnz * sizeof(*C.col), meta.streams[0]);
     C.col = static_cast<std::int32_t*>(col_ptr);
 
     // Bin rows over NNZ
-    binning(C, meta, device, get_value);
+    binning<T, Params, BinningType::SYM2>(C, meta, get_value);
 
     utils::stream_sync(meta.streams[0]);
 }
