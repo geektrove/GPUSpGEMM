@@ -42,7 +42,7 @@ __global__ void k_sym_smem_pwarp(
     auto* s_tables = reinterpret_cast<std::int32_t*>(smem);
 
     for (auto i = tib; i < total_table_size; i += block_size)
-        s_tables[i] = -1;
+        s_tables[i] = HASH_EMPTY;
     block.sync();
 
     const auto row_id = utils::divpow2(tig, SYM_PWARP_SIZE);
@@ -59,8 +59,8 @@ __global__ void k_sym_smem_pwarp(
             const auto key = b_col[k];
             auto hash = utils::modpow2(key * HASH_SCALE, table_size);
             while (true) {
-                const auto old = atomicCAS_block(s_table + hash, -1, key);
-                if (old == -1) {
+                const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY) {
                     l_nnz++;
                     break;
                 }
@@ -94,7 +94,7 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
     auto* s_nnz = s_table + table_size;
 
     for (auto i = tib; i < table_size; i += block_size)
-        s_table[i] = -1;
+        s_table[i] = HASH_EMPTY;
     cg::invoke_one(block, [&] { *s_nnz = 0; });
     block.sync();
 
@@ -109,8 +109,8 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
             const auto key = b_col[k];
             auto hash = utils::modpow2(key * HASH_SCALE, table_size);
             while (true) {
-                const auto old = atomicCAS_block(s_table + hash, -1, key);
-                if (old == -1) {
+                const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY) {
                     atomicAdd_block(s_nnz, 1);
                     break;
                 }
@@ -146,7 +146,7 @@ __global__ void k_sym_smem_max(
     auto* s_nnz = s_table + table_size;
 
     for (auto i = tib; i < table_size; i += block_size)
-        s_table[i] = -1;
+        s_table[i] = HASH_EMPTY;
     cg::invoke_one(block, [&] { *s_nnz = 0; });
 
     const auto row = bins[grid.block_rank()];
@@ -164,8 +164,8 @@ __global__ void k_sym_smem_max(
                 const auto key = b_col[k];
                 auto hash = (key * HASH_SCALE) % table_size;
                 while (true) {
-                    const auto old = atomicCAS_block(s_table + hash, -1, key);
-                    if (old == -1) {
+                    const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
+                    if (old == HASH_EMPTY) {
                         if (atomicAdd_block(s_nnz, 1) >= threshold)
                             return;
                         break;
@@ -208,7 +208,7 @@ __global__ void k_sym_global(
 
     auto* table = tables + (static_cast<ptrdiff_t>(grid.block_rank()) * table_size);
     for (auto i = tib; i < table_size; i += block_size)
-        table[i] = -1;
+        table[i] = HASH_EMPTY;
     cg::invoke_one(block, [&] { s_nnz = 0; });
 
     const auto row = bins[grid.block_rank()];
@@ -224,8 +224,8 @@ __global__ void k_sym_global(
             const auto key = b_col[k];
             auto hash = (key * HASH_SCALE) % table_size;
             while (true) {
-                const auto old = atomicCAS_block(table + hash, -1, key);
-                if (old == -1) {
+                const auto old = atomicCAS_block(table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY) {
                     atomicAdd_block(&s_nnz, 1);
                     break;
                 }

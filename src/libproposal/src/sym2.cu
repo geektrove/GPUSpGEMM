@@ -44,7 +44,7 @@ __global__ void k_sym2_smem_pwarp(
     auto* s_offsets = s_tables + total_table_size;
 
     for (auto i = tib; i < total_table_size; i += block_size)
-        s_tables[i] = -1;
+        s_tables[i] = HASH_EMPTY;
     if (tib < rows_per_block)
         s_offsets[tib] = 0;
     block.sync();
@@ -64,8 +64,8 @@ __global__ void k_sym2_smem_pwarp(
             const auto key = b_col[k];
             auto hash = utils::modpow2(key * HASH_SCALE, table_size);
             while (true) {
-                const auto old = atomicCAS_block(s_table + hash, -1, key);
-                if (old == -1 || old == key)
+                const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY || old == key)
                     break;
                 hash = utils::modpow2(hash + 1, table_size);
             }
@@ -76,9 +76,9 @@ __global__ void k_sym2_smem_pwarp(
     // Condense the column indices
     for (auto offset = 0; offset < table_size; offset += SYM_PWARP_SIZE) {
         const auto i = offset + tip;
-        const auto col = i < table_size ? s_table[i] : -1;
+        const auto col = i < table_size ? s_table[i] : HASH_EMPTY;
         tile.sync();
-        if (col != -1)
+        if (col != HASH_EMPTY)
             s_table[atomicAdd_block(s_offset, 1)] = col;
     }
     tile.sync();
@@ -117,7 +117,7 @@ __global__ void k_sym2_smem(
     auto* s_offset = s_table + table_size;
 
     for (auto i = tib; i < table_size; i += block_size)
-        s_table[i] = -1;
+        s_table[i] = HASH_EMPTY;
     cg::invoke_one(block, [&] { *s_offset = 0; });
     block.sync();
 
@@ -133,8 +133,8 @@ __global__ void k_sym2_smem(
             const auto key = b_col[k];
             auto hash = utils::modpow2(key * HASH_SCALE, table_size);
             while (true) {
-                const auto old = atomicCAS_block(s_table + hash, -1, key);
-                if (old == -1 || old == key)
+                const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY || old == key)
                     break;
                 hash = utils::modpow2(hash + 1, table_size);
             }
@@ -145,9 +145,9 @@ __global__ void k_sym2_smem(
     // Condense the column indices
     for (auto offset = 0; offset < table_size; offset += block_size) {
         const auto i = offset + tib;
-        const auto col = i < table_size ? s_table[i] : -1;
+        const auto col = i < table_size ? s_table[i] : HASH_EMPTY;
         block.sync();
-        if (col != -1)
+        if (col != HASH_EMPTY)
             s_table[atomicAdd_block(s_offset, 1)] = col;
     }
     block.sync();
@@ -186,7 +186,7 @@ __global__ void k_sym2_smem_max(
     auto* s_offset = s_table + table_size;
 
     for (auto i = tib; i < table_size; i += block_size)
-        s_table[i] = -1;
+        s_table[i] = HASH_EMPTY;
     cg::invoke_one(block, [&] { *s_offset = 0; });
     block.sync();
 
@@ -202,8 +202,8 @@ __global__ void k_sym2_smem_max(
             const auto key = b_col[k];
             auto hash = (key * HASH_SCALE) % table_size;
             while (true) {
-                const auto old = atomicCAS_block(s_table + hash, -1, key);
-                if (old == -1 || old == key)
+                const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY || old == key)
                     break;
                 hash = hash + 1 < table_size ? hash + 1 : 0;
             }
@@ -214,9 +214,9 @@ __global__ void k_sym2_smem_max(
     // Condense the column indices
     for (auto offset = 0; offset < table_size; offset += block_size) {
         const auto i = offset + tib;
-        const auto col = i < table_size ? s_table[i] : -1;
+        const auto col = i < table_size ? s_table[i] : HASH_EMPTY;
         block.sync();
-        if (col != -1)
+        if (col != HASH_EMPTY)
             s_table[atomicAdd_block(s_offset, 1)] = col;
     }
     block.sync();
@@ -254,7 +254,7 @@ __global__ void k_sym2_global(
 
     auto* table = tables + (static_cast<ptrdiff_t>(grid.block_rank()) * table_size);
     for (auto i = tib; i < table_size; i += block_size)
-        table[i] = -1;
+        table[i] = HASH_EMPTY;
     cg::invoke_one(block, [&] { s_offset = 0; });
     block.sync();
 
@@ -270,8 +270,8 @@ __global__ void k_sym2_global(
             const auto key = b_col[k];
             auto hash = (key * HASH_SCALE) % table_size;
             while (true) {
-                const auto old = atomicCAS_block(table + hash, -1, key);
-                if (old == -1 || old == key)
+                const auto old = atomicCAS_block(table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY || old == key)
                     break;
                 hash = hash + 1 < table_size ? hash + 1 : 0;
             }
@@ -282,9 +282,9 @@ __global__ void k_sym2_global(
     // Condense the column indices
     for (auto offset = 0; offset < table_size; offset += block_size) {
         const auto i = offset + tib;
-        const auto col = i < table_size ? table[i] : -1;
+        const auto col = i < table_size ? table[i] : HASH_EMPTY;
         block.sync();
-        if (col != -1)
+        if (col != HASH_EMPTY)
             table[atomicAdd_block(&s_offset, 1)] = col;
     }
     block.sync();

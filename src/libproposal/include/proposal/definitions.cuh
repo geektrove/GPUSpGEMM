@@ -4,6 +4,7 @@
 
 inline constexpr std::int32_t WARP_SIZE = 32;
 
+inline constexpr std::int32_t HASH_EMPTY = -1;
 inline constexpr std::int32_t HASH_SCALE = 107;
 
 inline constexpr std::int32_t SYM_PWARP_SIZE = 4;
