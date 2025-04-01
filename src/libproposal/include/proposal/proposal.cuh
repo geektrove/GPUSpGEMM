@@ -8,15 +8,14 @@
 
 #include <utils/utils.cuh>
 
+#include <proposal/binning.cuh>
 #include <proposal/cleanup.cuh>
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 #include <proposal/num.cuh>
-#include <proposal/num_binning.cuh>
 #include <proposal/setup.cuh>
 #include <proposal/sym.cuh>
 #include <proposal/sym2.cuh>
-#include <proposal/sym_binning.cuh>
 
 template<std::floating_point T>
 auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
@@ -34,7 +33,10 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     // Symbolic binning
     SPDLOG_DEBUG("Starting symbolic binning phase");
-    sym_binning(C, meta, device);
+    auto get_value_sym = [values = C.rpt] __device__(const std::int32_t row) {
+        return values[row];
+    };
+    binning(C, meta, device, get_value_sym);
     SPDLOG_DEBUG("Finished symbolic binning phase");
 
     // Symbolic
@@ -44,7 +46,7 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     // Symbolic binning 2
     SPDLOG_DEBUG("Starting symbolic binning 2 phase");
-    sym_binning2(C, meta, device);
+    sym_binning2(C, meta, device, get_value_sym);
     SPDLOG_DEBUG("Finished symbolic binning 2 phase");
 
     // Symbolic 2
@@ -54,7 +56,10 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     // Numeric binning
     SPDLOG_DEBUG("Starting numeric binning phase");
-    num_binning(C, meta, device);
+    auto get_value_num = [values = C.rpt] __device__(const std::int32_t row) {
+        return values[row + 1] - values[row];
+    };
+    binning(C, meta, device, get_value_num);
     SPDLOG_DEBUG("Finished numeric binning phase");
 
     // Numeric

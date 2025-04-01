@@ -1,5 +1,4 @@
-add_library_wrapped(libproposal PUBLIC src/sym.cu src/sym2.cu
-                    src/num_binning.cu)
+add_library_wrapped(libproposal PUBLIC src/sym.cu src/sym2.cu)
 target_include_directories(libproposal PUBLIC include)
 
 target_link_libraries(libproposal PUBLIC libutils)
