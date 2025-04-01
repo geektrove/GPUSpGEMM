@@ -48,8 +48,8 @@ struct Parameters<CC86> {
     using NUM_CUDA_ARRAY = cuda::std::array<std::int32_t, NUM_N_BINS>;
     static constexpr NUM_CUDA_ARRAY NUM_BLOCK_SIZES = {512, 128, 256, 512, 1024, 1024};
     static constexpr NUM_CUDA_ARRAY NUM_TABLE_SIZES =
-        {2758, 624, 1336, 2758, 8448, 12383};
-    static constexpr NUM_CUDA_ARRAY NUM_RANGES = {43, 624, 1336, 2758, 8448, 12383};
+        {2758, 624, 1336, 2758, 8448, INT32_MAX};
+    static constexpr NUM_CUDA_ARRAY NUM_RANGES = {43, 624, 1336, 2758, 8448, INT32_MAX};
 
     static constexpr std::int32_t MAX_N_BINS = std::max(
         {SYM1_N_BINS, SYM2_N_BINS, NUM_N_BINS});
