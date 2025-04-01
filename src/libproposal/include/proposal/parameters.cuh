@@ -23,13 +23,17 @@ struct Parameters<CC86> {
     // static constexpr std::int32_t CC = CC86;
     static constexpr std::int32_t OPTIMAL_BLOCK_SIZE = 512;
 
-    static constexpr std::int32_t SYM1_N_BINS = 6;
+    static constexpr std::int32_t SYM1_N_BINS = 7;
+    static constexpr std::int32_t SYM1_PWARP_BIN = 0;
+    static constexpr std::int32_t SYM1_MAX_SMEM_BIN = 5;
+    static constexpr std::int32_t SYM1_GLOBAL_MEM_BIN = 6;
     using SYM1_CUDA_ARRAY = cuda::std::array<std::int32_t, SYM1_N_BINS>;
-    static constexpr SYM1_CUDA_ARRAY SYM1_BLOCK_SIZES = {512, 128, 256, 512, 1024, 1024};
+    static constexpr SYM1_CUDA_ARRAY SYM1_BLOCK_SIZES =
+        {512, 128, 256, 512, 1024, 1024, 1024};
     static constexpr SYM1_CUDA_ARRAY SYM1_TABLE_SIZES =
-        {4096, 1024, 2048, 8192, 16384, 25343};
+        {4096, 1024, 2048, 8192, 16384, 25343, INT32_MAX};
     static constexpr SYM1_CUDA_ARRAY SYM1_RANGES =
-        {26, 853, 1706, 6826, 13653, INT32_MAX};
+        {26, 853, 1706, 6826, 13653, INT32_MAX, INT32_MAX};
 
     static constexpr std::int32_t SYM2_N_BINS = 7;
     using SYM2_CUDA_ARRAY = cuda::std::array<std::int32_t, SYM2_N_BINS>;
