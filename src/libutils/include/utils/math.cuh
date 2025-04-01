@@ -10,11 +10,13 @@
 
 namespace utils {
 
-constexpr auto ispow2(std::integral auto a) -> bool {
+template<std::integral T>
+constexpr auto ispow2(T a) -> bool {
     assert(a > 0);
     if (a <= 0)
         __builtin_unreachable();
-    return (a & (a - 1)) == 0;
+    const auto unsigned_a = gsl::narrow_cast<std::make_unsigned_t<T>>(a);
+    return cuda::std::has_single_bit(unsigned_a);
 }
 
 constexpr auto modpow2(std::integral auto a, std::integral auto b) {
