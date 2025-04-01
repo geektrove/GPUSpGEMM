@@ -34,6 +34,7 @@ __global__ void k_sym2_smem_pwarp(
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto tip = tib % SYM_PWARP_SIZE;
+    const auto pib = tib / SYM_PWARP_SIZE;
     const auto block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
     const auto rows_per_block = block_size / SYM_PWARP_SIZE;
@@ -52,9 +53,8 @@ __global__ void k_sym2_smem_pwarp(
     if (row_id >= bin_size)
         return;
 
-    auto* s_table = s_tables
-                    + (static_cast<ptrdiff_t>((tib / SYM_PWARP_SIZE) * table_size));
-    auto* s_offset = s_offsets + (tib / SYM_PWARP_SIZE);
+    auto* s_table = s_tables + static_cast<ptrdiff_t>(pib * table_size);
+    auto* s_offset = s_offsets + pib;
 
     // Aggregate the column indices in the hash table
     const auto row = bins[row_id];
@@ -90,7 +90,7 @@ __global__ void k_sym2_smem_pwarp(
         const auto col = s_table[i];
         std::int32_t n_less = 0;
         for (std::int32_t j = 0; j < nnz; j++) {
-            if (s_table[i] < col)
+            if (s_table[j] < col)
                 n_less++;
         }
         c_col[c_offset + n_less] = col;
@@ -159,7 +159,7 @@ __global__ void k_sym2_smem(
         const auto col = s_table[i];
         std::int32_t n_less = 0;
         for (std::int32_t j = 0; j < nnz; j++) {
-            if (s_table[i] < col)
+            if (s_table[j] < col)
                 n_less++;
         }
         c_col[c_offset + n_less] = col;
@@ -228,7 +228,7 @@ __global__ void k_sym2_smem_max(
         const auto col = s_table[i];
         std::int32_t n_less = 0;
         for (std::int32_t j = 0; j < nnz; j++) {
-            if (s_table[i] < col)
+            if (s_table[j] < col)
                 n_less++;
         }
         c_col[c_offset + n_less] = col;
@@ -296,7 +296,7 @@ __global__ void k_sym2_global(
         const auto col = table[i];
         std::int32_t n_less = 0;
         for (std::int32_t j = 0; j < nnz; j++) {
-            if (table[i] < col)
+            if (table[j] < col)
                 n_less++;
         }
         c_col[c_offset + n_less] = col;

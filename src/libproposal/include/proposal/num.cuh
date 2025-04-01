@@ -79,10 +79,10 @@ __global__ void k_num_smem_pwarp(
     cg::wait(tile);
     tile.sync();
 
-    for (auto i = a_rpt[row] + tip; i < a_rpt[row] + 1; i += NUM_PWARP_SIZE) {
+    for (auto i = a_rpt[row] + tip; i < a_rpt[row + 1]; i += NUM_PWARP_SIZE) {
         const auto a_value = a_val[i];
         const auto colrow = a_col[i];
-        for (auto k = b_rpt[colrow]; k < b_rpt[colrow]; k++) {
+        for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
             const auto idx = find_key(s_cols, size, b_col[k]);
             atomicAdd_block(s_vals + idx, a_value * b_val[k]);
         }
