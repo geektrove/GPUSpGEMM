@@ -140,7 +140,7 @@ void sym2(const utils::DeviceCSR<T>& A,
     }
     SPDLOG_DEBUG("Sym2: bin 0 size is {}", meta.h_bin_sizes[0]);
     if (meta.h_bin_sizes[0] > 0) {
-        const auto rows_per_block = meta.block_sizes[0] / SYM_PWARP_SIZE;
+        const auto rows_per_block = utils::divpow2(meta.block_sizes[0], SYM_PWARP_SIZE);
         const auto smem = (meta.table_sizes[0] + rows_per_block) * IdxByteSize;
         utils::handle_cuda_error(
             cudaFuncSetAttribute(k_sym2_smem_pwarp,
@@ -151,7 +151,7 @@ void sym2(const utils::DeviceCSR<T>& A,
                              meta.block_sizes[0],
                              smem,
                              meta.streams[0],
-                             meta.table_sizes[0] / rows_per_block,
+                             utils::divpow2(meta.table_sizes[0], rows_per_block),
                              A.rpt,
                              A.col,
                              B.rpt,

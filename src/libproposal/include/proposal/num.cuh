@@ -55,11 +55,11 @@ __global__ void k_num_smem_pwarp(
     const auto tile = cg::tiled_partition<NUM_PWARP_SIZE>(block);
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
-    const auto pib = tib / NUM_PWARP_SIZE;
-    const auto tip = tib % NUM_PWARP_SIZE;
+    const auto pib = utils::divpow2(tib, NUM_PWARP_SIZE);
+    const auto tip = utils::modpow2(tib, NUM_PWARP_SIZE);
     const auto block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
-    const auto rows_per_block = block_size / NUM_PWARP_SIZE;
+    const auto rows_per_block = utils::divpow2(block_size, NUM_PWARP_SIZE);
     const auto total_table_size = table_size * rows_per_block;
 
     auto* s_vals_all = reinterpret_cast<T*>(smem);
@@ -67,7 +67,7 @@ __global__ void k_num_smem_pwarp(
     auto* s_vals = s_vals_all + (pib * table_size);
     auto* s_cols = s_cols_all + static_cast<ptrdiff_t>(pib * table_size);
 
-    const auto row_id = tig / NUM_PWARP_SIZE;
+    const auto row_id = utils::divpow2(tig, NUM_PWARP_SIZE);
     if (row_id >= bin_size)
         return;
     const auto row = bins[row_id];
@@ -126,9 +126,9 @@ __global__ void k_num_smem(const __grid_constant__ std::int32_t table_size,
     cg::wait(block);
     block.sync();
 
-    const auto i_offset = tib / WARP_SIZE;
-    const auto i_step = block_size / WARP_SIZE;
-    const auto k_offset = tib % WARP_SIZE;
+    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
+    const auto i_step = utils::divpow2(block_size, WARP_SIZE);
+    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
     for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
         const auto a_value = a_val[i];
@@ -170,9 +170,9 @@ __global__ void k_num_global(
     for (auto i = tib; i < size; i += block_size)
         vals[i] = 0;
 
-    const auto i_offset = tib / WARP_SIZE;
-    const auto i_step = block_size / WARP_SIZE;
-    const auto k_offset = tib % WARP_SIZE;
+    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
+    const auto i_step = utils::divpow2(block_size, WARP_SIZE);
+    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
     for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
         const auto a_value = a_val[i];
@@ -247,7 +247,7 @@ void num(const utils::DeviceCSR<T>& A,
     }
     SPDLOG_DEBUG("Num: bin 0 size is {}", meta.h_bin_sizes[0]);
     if (meta.h_bin_sizes[0] > 0) {
-        const auto rows_per_block = meta.block_sizes[0] / NUM_PWARP_SIZE;
+        const auto rows_per_block = utils::divpow2(meta.block_sizes[0], NUM_PWARP_SIZE);
         const auto smem = meta.table_sizes[0] * ItemByteSize;
         utils::handle_cuda_error(
             cudaFuncSetAttribute(k_num_smem_pwarp<T>,
@@ -258,7 +258,7 @@ void num(const utils::DeviceCSR<T>& A,
                              meta.block_sizes[0],
                              smem,
                              meta.streams[0],
-                             meta.table_sizes[0] / rows_per_block,
+                             utils::divpow2(meta.table_sizes[0], rows_per_block),
                              A.rpt,
                              A.col,
                              A.val,

@@ -33,11 +33,11 @@ __global__ void k_sym_smem_pwarp(
     const auto tile = cg::tiled_partition<SYM_PWARP_SIZE>(block);
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
-    const auto tip = tib % SYM_PWARP_SIZE;
-    const auto pib = tib / SYM_PWARP_SIZE;
+    const auto tip = utils::modpow2(tib, SYM_PWARP_SIZE);
+    const auto pib = utils::divpow2(tib, SYM_PWARP_SIZE);
     const auto block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
-    const auto rows_per_block = block_size / SYM_PWARP_SIZE;
+    const auto rows_per_block = utils::divpow2(block_size, SYM_PWARP_SIZE);
     const auto total_table_size = table_size * rows_per_block;
 
     auto* s_tables = reinterpret_cast<std::int32_t*>(smem);
@@ -46,7 +46,7 @@ __global__ void k_sym_smem_pwarp(
         s_tables[i] = -1;
     block.sync();
 
-    const auto row_id = tig / SYM_PWARP_SIZE;
+    const auto row_id = utils::divpow2(tig, SYM_PWARP_SIZE);
     if (row_id >= bin_size)
         return;
 
@@ -58,7 +58,7 @@ __global__ void k_sym_smem_pwarp(
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
             const auto key = b_col[k];
-            auto hash = (key * HASH_SCALE) % table_size;
+            auto hash = utils::modpow2(key * HASH_SCALE, table_size);
             while (true) {
                 const auto old = atomicCAS_block(s_table + hash, -1, key);
                 if (old == -1) {
@@ -67,7 +67,7 @@ __global__ void k_sym_smem_pwarp(
                 }
                 if (old == key)
                     break;
-                hash = (hash + 1) % table_size;
+                hash = utils::modpow2(hash + 1, table_size);
             }
         }
     }
@@ -88,8 +88,8 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
-    const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
     auto* s_nnz = s_table + table_size;
@@ -100,15 +100,15 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
     block.sync();
 
     const auto row = bins[grid.block_rank()];
-    const auto i_offset = tib / WARP_SIZE;
-    const auto i_step = block_size / WARP_SIZE;
-    const auto k_offset = tib % WARP_SIZE;
+    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
+    const auto i_step = utils::divpow2(block_size, WARP_SIZE);
+    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
     for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
             const auto key = b_col[k];
-            auto hash = (key * HASH_SCALE) % table_size;
+            auto hash = utils::modpow2(key * HASH_SCALE, table_size);
             while (true) {
                 const auto old = atomicCAS_block(s_table + hash, -1, key);
                 if (old == -1) {
@@ -117,7 +117,7 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
                 }
                 if (old == key)
                     break;
-                hash = (hash + 1) % table_size;
+                hash = utils::modpow2(hash + 1, table_size);
             }
         }
     }
@@ -140,8 +140,8 @@ __global__ void k_sym_smem_max(
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
-    const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
     auto* s_nnz = s_table + table_size;
@@ -151,9 +151,9 @@ __global__ void k_sym_smem_max(
     cg::invoke_one(block, [&] { *s_nnz = 0; });
 
     const auto row = bins[grid.block_rank()];
-    const auto i_offset = tib / WARP_SIZE;
-    const auto i_step = block_size / WARP_SIZE;
-    const auto k_offset = tib % WARP_SIZE;
+    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
+    const auto i_step = utils::divpow2(block_size, WARP_SIZE);
+    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
     const auto threshold = table_size * SYM_RANGE_RATIO;
     block.sync();
@@ -213,9 +213,9 @@ __global__ void k_sym_global(
     cg::invoke_one(block, [&] { s_nnz = 0; });
 
     const auto row = bins[grid.block_rank()];
-    const auto i_offset = tib / WARP_SIZE;
-    const auto i_step = block_size / WARP_SIZE;
-    const auto k_offset = tib % WARP_SIZE;
+    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
+    const auto i_step = utils::divpow2(block_size, WARP_SIZE);
+    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
     block.sync();
 

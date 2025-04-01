@@ -43,7 +43,7 @@ __global__ void k_compute_nip(
         // use a warp per row
         if (row_length_max >= WARP_SIZE) {
             std::int32_t thread_row_nip = 0;
-            auto row_begin = (tig / WARP_SIZE) * WARP_SIZE;
+            auto row_begin = utils::divpow2(tig, WARP_SIZE) * WARP_SIZE;
             for (std::int32_t row_offset = 0; row_offset < WARP_SIZE; row_offset++) {
                 const auto row = row_begin + row_offset;
                 if (row >= m)
