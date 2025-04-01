@@ -14,9 +14,8 @@
 
 #include <utils/utils.cuh>
 
-#include <proposal/definitions.cuh>
-#include <proposal/device.cuh>
 #include <proposal/meta.cuh>
+#include <proposal/parameters.cuh>
 #include <proposal/utils.cuh>
 
 namespace cg = cooperative_groups;
@@ -82,117 +81,8 @@ __global__ void k_compute_nip(
     cg::reduce_update_async(tile, max_nip_ref, l_nip, cg::greater<std::int32_t>{});
 }
 
-template<std::floating_point T>
-void h_compute_nip(const utils::DeviceCSR<T>& A,
-                   const utils::DeviceCSR<T>& B,
-                   utils::DeviceCSR<T>& C,
-                   const Device& device) {
-    static constexpr std::int32_t BLOCK512 = 512;
-    static constexpr std::int32_t BLOCK1024 = 1024;
-
-    // Realistically only 512 and 1024 block sizes are optimal
-    // starting from compute capability 1.2, but in any other case,
-    // we can use 1024 threads per block as a fallback
-    switch (device.optimal_block_size) {
-    case BLOCK512:
-        utils::launch_kernel(k_compute_nip<BLOCK512>,
-                             cuda::ceil_div(C.m, BLOCK512),
-                             BLOCK512,
-                             0,
-                             cudaStreamDefault,
-                             A.rpt,
-                             A.col,
-                             B.rpt,
-                             C.m,
-                             C.rpt,
-                             C.rpt + C.m);
-        break;
-    default:
-        utils::launch_kernel(k_compute_nip<BLOCK1024>,
-                             cuda::ceil_div(C.m, BLOCK1024),
-                             BLOCK1024,
-                             0,
-                             cudaStreamDefault,
-                             A.rpt,
-                             A.col,
-                             B.rpt,
-                             C.m,
-                             C.rpt,
-                             C.rpt + C.m);
-        break;
-    }
-}
-
-inline void fill_device_properties(Device& device) {
-    // Get current device ID
-    int id{};
-    utils::handle_cuda_error(cudaGetDevice(&id));
-
-    // Get device properties
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.n_sm, cudaDevAttrMultiProcessorCount, id));
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.max_threads_per_sm,
-                               cudaDevAttrMaxThreadsPerMultiProcessor,
-                               id));
-    utils::handle_cuda_error(cudaDeviceGetAttribute(&device.max_threads_per_block,
-                                                    cudaDevAttrMaxThreadsPerBlock,
-                                                    id));
-    utils::handle_cuda_error(cudaDeviceGetAttribute(&device.max_blocks_per_sm,
-                                                    cudaDevAttrMaxBlocksPerMultiprocessor,
-                                                    id));
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.smem_per_sm,
-                               cudaDevAttrMaxSharedMemoryPerMultiprocessor,
-                               id));
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.smem_per_block_reserved,
-                               cudaDevAttrReservedSharedMemoryPerBlock,
-                               id));
-    utils::handle_cuda_error(
-        cudaDeviceGetAttribute(&device.max_smem_per_block,
-                               cudaDevAttrMaxSharedMemoryPerBlockOptin,
-                               id));
-
-    // Compute optimal block size (power of 2)
-    device.optimal_block_size = std::invoke([&] {
-        assert(utils::ispow2(device.max_threads_per_block));
-        auto block_size = device.max_threads_per_block;
-        while (device.max_threads_per_sm % block_size != 0)
-            block_size /= 2;
-        return block_size;
-    });
-    device.min_block_size = utils::bitceil(device.max_threads_per_sm
-                                           / device.max_blocks_per_sm);
-
-    SPDLOG_DEBUG("Number of SMs: {}", device.n_sm);
-    SPDLOG_DEBUG("Max threads per SM: {}", device.max_threads_per_sm);
-    SPDLOG_DEBUG("Max threads per block: {}", device.max_threads_per_block);
-    SPDLOG_DEBUG("Max blocks per SM: {}", device.max_blocks_per_sm);
-    SPDLOG_DEBUG("Shared memory per SM: {}", device.smem_per_sm);
-    SPDLOG_DEBUG("Shared memory per block (reserved): {}",
-                 device.smem_per_block_reserved);
-    SPDLOG_DEBUG("Shared memory per block (max opt in): {}", device.max_smem_per_block);
-    SPDLOG_DEBUG("Optimal block size: {}", device.optimal_block_size);
-    SPDLOG_DEBUG("Minimum block size: {}", device.min_block_size);
-}
-
-inline void fill_n_bins(Meta& meta, const Device& device) {
-    // +1 PWARP bin
-    // +1 Max SMEM bin
-    // +1 Global memory bin used in sym2 and num stages
-    meta.n_bins = 3;
-
-    // Add one bin for each power of 2 block size in the range
-    // [MIN_BLOCK_SIZE, MAX_THREADS_PER_SM]
-    // Note that from MAX_THREADS_PER_BLOCK to MAX_THREADS_PER_SM
-    // the shared memory size is scaled rather than the number of threads
-    meta.n_bins += utils::ilog2(device.max_threads_per_sm / device.min_block_size) + 1;
-
-    SPDLOG_DEBUG("Number of bins: {}", meta.n_bins);
-}
-
-inline void allocate_device_mem(const std::int32_t m, Meta& meta) {
+template<typename Params>
+inline void allocate_device_mem(const std::int32_t m, Meta<Params>& meta) {
     // Estimate CUB storage size
     size_t cub_requested{};
     cub::DeviceFor::Bulk(nullptr, cub_requested, m, [] __device__(int) {});
@@ -211,16 +101,15 @@ inline void allocate_device_mem(const std::int32_t m, Meta& meta) {
     meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
 
     // Allocate device memory
-    const auto d_memsize = ((m + 3 * meta.n_bins + 2) * sizeof(std::int32_t))
+    const auto d_memsize = ((m + 2 * Params::MAX_N_BINS + 2) * sizeof(std::int32_t))
                            + meta.cub_storage_size;
     meta.d_ptr = utils::malloc_async(d_memsize, meta.streams[0]);
 
     // Assign pointers to the allocated memory
     meta.d_bins = static_cast<std::int32_t*>(meta.d_ptr);
-    meta.d_bin_ranges = meta.d_bins + m;
-    meta.d_bin_sizes = meta.d_bin_ranges + meta.n_bins;
-    meta.d_bin_offsets = meta.d_bin_sizes + meta.n_bins;
-    meta.d_max_row_nnz = meta.d_bin_offsets + meta.n_bins;
+    meta.d_bin_sizes = meta.d_bins + Params::MAX_N_BINS;
+    meta.d_bin_offsets = meta.d_bin_sizes + Params::MAX_N_BINS;
+    meta.d_max_row_nnz = meta.d_bin_offsets + Params::MAX_N_BINS;
     meta.d_total_nnz = meta.d_max_row_nnz + 1;
     meta.d_cub_storage = meta.d_total_nnz + 1;
 
@@ -228,138 +117,42 @@ inline void allocate_device_mem(const std::int32_t m, Meta& meta) {
     SPDLOG_DEBUG("-- CUB memory on device: {}", meta.cub_storage_size);
 }
 
-inline void allocate_host_memory(Meta& meta) {
-    // Allocate host memory
-    const auto h_memsize = (5 * meta.n_bins + 2) * sizeof(std::int32_t);
-    meta.h_ptr = utils::malloc<utils::Location::Host>(h_memsize);
-
-    // Assign pointers to the allocated memory
-    meta.block_sizes = static_cast<std::int32_t*>(meta.h_ptr);
-    meta.table_sizes = meta.block_sizes + meta.n_bins;
-    meta.h_bin_ranges = meta.table_sizes + meta.n_bins;
-    meta.h_bin_sizes = meta.h_bin_ranges + meta.n_bins;
-    meta.h_bin_offsets = meta.h_bin_sizes + meta.n_bins;
-    meta.h_max_row_nnz = meta.h_bin_offsets + meta.n_bins;
-    meta.h_total_nnz = meta.h_max_row_nnz + 1;
-
-    SPDLOG_DEBUG("Allocated memory on host: {}", h_memsize);
-}
-
-inline void fill_sizes_for_sym_binning(Meta& meta, const Device& device) {
-    auto calculate_sym_table_size =
-        [&](std::int32_t n_blocks, std::int32_t reserved = 0, bool round_down = true) {
-            const auto smem = get_smem_size(device, n_blocks);
-            auto table_size = smem / gsl::narrow_cast<std::int32_t>(sizeof(std::int32_t));
-            table_size -= reserved;
-            if (round_down)
-                // Round down to the nearest power of 2
-                table_size = utils::bitfloor(table_size);
-            return table_size;
-        };
-
-    meta.block_sizes[0] = device.optimal_block_size;
-    meta.table_sizes[0] = calculate_sym_table_size(
-        device.max_threads_per_sm / meta.block_sizes[0],
-        device.optimal_block_size / SYM_PWARP_SIZE);
-    meta.block_sizes[1] = device.min_block_size;
-    meta.table_sizes[1] = calculate_sym_table_size(device.max_threads_per_sm
-                                                       / meta.block_sizes[1],
-                                                   1);
-    std::int32_t i = 2;
-    for (; meta.block_sizes[i - 1] < device.max_threads_per_block; i++) {
-        meta.block_sizes[i] = meta.block_sizes[i - 1] * 2;
-        meta.table_sizes[i] = calculate_sym_table_size(device.max_threads_per_sm
-                                                           / meta.block_sizes[i],
-                                                       1);
-    }
-    for (auto n_blocks = device.max_threads_per_sm / device.max_threads_per_block / 2;
-         n_blocks > 0;
-         n_blocks /= 2) {
-        meta.block_sizes[i] = device.max_threads_per_block;
-        meta.table_sizes[i] = calculate_sym_table_size(n_blocks, 1);
-        i++;
-    }
-    meta.block_sizes[meta.n_bins - 2] = device.max_threads_per_block;
-    meta.table_sizes[meta.n_bins - 2] = calculate_sym_table_size(1, 1, false);
-    meta.block_sizes[meta.n_bins - 1] = device.max_threads_per_block;
-    meta.table_sizes[meta.n_bins - 1] = std::numeric_limits<std::int32_t>::max();
-
-    meta.h_bin_ranges[0] = gsl::narrow_cast<std::int32_t>(
-        SYM_RANGE_RATIO
-        * gsl::narrow_cast<double>(meta.table_sizes[0]
-                                   / (meta.block_sizes[0] / SYM_PWARP_SIZE)));
-    for (i = 1; i + 2 < meta.n_bins; i++)
-        meta.h_bin_ranges[i] = gsl::narrow_cast<std::int32_t>(SYM_RANGE_RATIO
-                                                              * meta.table_sizes[i]);
-    meta.h_bin_ranges[meta.n_bins - 2] = std::numeric_limits<std::int32_t>::max();
-    meta.h_bin_ranges[meta.n_bins - 1] = std::numeric_limits<std::int32_t>::max();
-
-    SPDLOG_DEBUG("Symbolic bins");
-    SPDLOG_DEBUG("* Last bin is unused during symbolic phase");
-    SPDLOG_DEBUG("{:>12s} {:>12s} {:>12s} {:>12s}",
-                 "Bin",
-                 "Block size",
-                 "Table size",
-                 "Range");
-    for (i = 0; i < meta.n_bins; i++) {
-        SPDLOG_DEBUG("{:12d} {:12d} {:12d} {:12d}",
-                     i,
-                     meta.block_sizes[i],
-                     meta.table_sizes[i],
-                     meta.h_bin_ranges[i]);
-    }
-}
-
-template<std::floating_point T>
+template<std::floating_point T, typename Params>
 void setup(const utils::DeviceCSR<T>& A,
            const utils::DeviceCSR<T>& B,
            utils::DeviceCSR<T>& C,
-           Meta& meta,
-           Device& device) {
+           Meta<Params>& meta) {
     NVTX3_FUNC_RANGE();
 
-    // Initialize C dimensions
+    // Inititalize C dimensions
     C.m = A.m;
     C.n = B.n;
 
-    // Allocate memory for C.rpt and initialize it to zero
+    // Allocate memory for C.rpt
     auto* rpt = utils::malloc_async((C.m + 1) * sizeof(std::int32_t));
     C.rpt = static_cast<std::int32_t*>(rpt);
+
+    // Compute NIP per row in C and find the maximum
     utils::memset_async(C.rpt + C.m, 0, sizeof(std::int32_t));
-
-    // Get device properties and compute optimal block size
-    fill_device_properties(device);
-
-    // Compute NIP per row in C
-    h_compute_nip(A, B, C, device);
-
-    // Calculate number of bins
-    fill_n_bins(meta, device);
+    utils::launch_kernel(k_compute_nip<Params::OPTIMAL_BLOCK_SIZE>,
+                         cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
+                         Params::OPTIMAL_BLOCK_SIZE,
+                         0,
+                         cudaStreamDefault,
+                         A.rpt,
+                         A.col,
+                         B.rpt,
+                         C.m,
+                         C.rpt,
+                         C.rpt + C.m);
+    utils::memcpy_async(&meta.h_max_row_nnz, C.rpt + C.m, sizeof(meta.h_max_row_nnz));
 
     // Create CUDA streams
-    auto* streams_ptr = utils::malloc<utils::Location::Host>(meta.n_bins
-                                                             * sizeof(cudaStream_t));
-    meta.streams = static_cast<cudaStream_t*>(streams_ptr);
-    for (std::int32_t i = 0; i < meta.n_bins; i++)
-        utils::handle_cuda_error(cudaStreamCreate(&meta.streams[i]));
+    for (auto& stream : meta.streams)
+        utils::handle_cuda_error(cudaStreamCreate(&stream));
 
     // Allocate device memory
     allocate_device_mem(C.m, meta);
-
-    // Allocate host memory
-    allocate_host_memory(meta);
-
-    // Copy the maximum NIP per row in C to the host
-    utils::memcpy_async(meta.h_max_row_nnz, C.rpt + C.m, sizeof(std::int32_t));
-
-    // Calculate table sizes and ranges for symbolic binning
-    fill_sizes_for_sym_binning(meta, device);
-
-    // Copy the symbolic bin ranges to the device
-    utils::memcpy_async(meta.d_bin_ranges,
-                        meta.h_bin_ranges,
-                        meta.n_bins * sizeof(std::int32_t),
-                        meta.streams[0]);
 
     // Create CUDA events
     for (auto& event : meta.events)
@@ -370,5 +163,5 @@ void setup(const utils::DeviceCSR<T>& A,
     utils::stream_sync(meta.streams[0]);
     utils::stream_sync();
 
-    SPDLOG_DEBUG("Max NIP per row is {}", *meta.h_max_row_nnz);
+    SPDLOG_DEBUG("Max NIP per row is {}", meta.h_max_row_nnz);
 }
