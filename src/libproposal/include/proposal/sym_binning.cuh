@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <concepts>
-#include <cstddef>
 #include <cstdlib>
 
 #include <cub/cub.cuh>
