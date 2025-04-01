@@ -195,29 +195,29 @@ void sym_binning2(utils::DeviceCSR<T>& C,
                   GetValueF get_value) {
     NVTX3_FUNC_RANGE();
 
+    // Calculate max NNZ per row
     utils::handle_cuda_error(cub::DeviceReduce::Max(meta.d_cub_storage,
                                                     meta.cub_storage_size,
                                                     C.rpt,
                                                     meta.d_max_row_nnz,
                                                     C.m));
+
+    // Scan C.rpt
+    utils::handle_cuda_error(cub::DeviceScan::ExclusiveSum(meta.d_cub_storage,
+                                                           meta.cub_storage_size,
+                                                           C.rpt,
+                                                           C.rpt,
+                                                           C.m + 1));
+
+    // Copy max and total NNZ to host
     utils::memcpy_async(meta.h_max_row_nnz,
                         meta.d_max_row_nnz,
                         sizeof(*meta.h_max_row_nnz));
-    utils::event_record(meta.events[0]);
-    utils::handle_cuda_error(cub::DeviceReduce::Sum(meta.d_cub_storage,
-                                                    meta.cub_storage_size,
-                                                    C.rpt,
-                                                    meta.d_total_nnz,
-                                                    C.m));
-    utils::memcpy_async(meta.h_total_nnz, meta.d_total_nnz, sizeof(*meta.h_total_nnz));
-    utils::event_sync(meta.events[0]);
-
-    SPDLOG_DEBUG("Max NNZ per row is {}", *meta.h_max_row_nnz);
+    utils::memcpy_async(meta.h_total_nnz, C.rpt + C.m, sizeof(*meta.h_total_nnz));
 
     // Update the table sizes for the global memory bin
     meta.table_sizes[meta.n_bins - 1] = gsl::narrow_cast<std::int32_t>(*meta.h_max_row_nnz
                                                                        / SYM_RANGE_RATIO);
-
     SPDLOG_DEBUG("Symbolic 2 bins");
     SPDLOG_DEBUG("{:>12s} {:>12s} {:>12s} {:>12s}",
                  "Bin",
@@ -232,22 +232,18 @@ void sym_binning2(utils::DeviceCSR<T>& C,
                      meta.h_bin_ranges[i]);
     }
 
+    // Wait for max and total NNZ
     utils::stream_sync();
+    SPDLOG_DEBUG("Max NNZ per row is {}", *meta.h_max_row_nnz);
+    SPDLOG_DEBUG("Total NNZ in C is {}", *meta.h_total_nnz);
 
+    // Allocate C.col
     C.nnz = *meta.h_total_nnz;
     auto* col_ptr = utils::malloc_async(C.nnz * sizeof(*C.col), meta.streams[0]);
     C.col = static_cast<std::int32_t*>(col_ptr);
 
-    SPDLOG_DEBUG("Total NNZ in C is {}", C.nnz);
-
+    // Bin rows over NNZ
     binning(C, meta, device, get_value);
 
-    utils::handle_cuda_error(cub::DeviceScan::ExclusiveSum(meta.d_cub_storage,
-                                                           meta.cub_storage_size,
-                                                           C.rpt,
-                                                           C.rpt,
-                                                           C.m + 1));
-
     utils::stream_sync(meta.streams[0]);
-    utils::stream_sync();
 }

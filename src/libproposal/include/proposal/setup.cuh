@@ -202,12 +202,6 @@ inline void allocate_device_mem(const std::int32_t m, Meta& meta) {
                            static_cast<std::int32_t*>(nullptr),
                            m);
     meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
-    cub::DeviceReduce::Sum(nullptr,
-                           cub_requested,
-                           static_cast<std::int32_t*>(nullptr),
-                           static_cast<std::int32_t*>(nullptr),
-                           m);
-    meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
     cub::DeviceScan::ExclusiveSum(nullptr,
                                   cub_requested,
                                   static_cast<std::int32_t*>(nullptr),

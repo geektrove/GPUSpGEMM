@@ -33,10 +33,10 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     // Symbolic binning
     SPDLOG_DEBUG("Starting symbolic binning phase");
-    auto get_value_sym = [values = C.rpt] __device__(const std::int32_t row) {
+    auto get_value_individual = [values = C.rpt] __device__(const std::int32_t row) {
         return values[row];
     };
-    binning(C, meta, device, get_value_sym);
+    binning(C, meta, device, get_value_individual);
     SPDLOG_DEBUG("Finished symbolic binning phase");
 
     // Symbolic
@@ -46,7 +46,10 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     // Symbolic binning 2
     SPDLOG_DEBUG("Starting symbolic binning 2 phase");
-    sym_binning2(C, meta, device, get_value_sym);
+    auto get_value_difference = [values = C.rpt] __device__(const std::int32_t row) {
+        return values[row + 1] - values[row];
+    };
+    sym_binning2(C, meta, device, get_value_difference);
     SPDLOG_DEBUG("Finished symbolic binning 2 phase");
 
     // Symbolic 2
@@ -56,10 +59,8 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     // Numeric binning
     SPDLOG_DEBUG("Starting numeric binning phase");
-    auto get_value_num = [values = C.rpt] __device__(const std::int32_t row) {
-        return values[row + 1] - values[row];
-    };
-    binning(C, meta, device, get_value_num);
+
+    binning(C, meta, device, get_value_difference);
     SPDLOG_DEBUG("Finished numeric binning phase");
 
     // Numeric
