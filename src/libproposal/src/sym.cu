@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cuda/std/cstddef>
 
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
@@ -25,7 +26,7 @@ __global__ void k_sym_smem_pwarp(
     const __grid_constant__ std::int32_t* const __restrict__ bins,
     const __grid_constant__ std::int32_t bin_size,
     __grid_constant__ std::int32_t* const __restrict__ nnzs) {
-    extern __shared__ std::int32_t smem[];
+    extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
@@ -36,8 +37,8 @@ __global__ void k_sym_smem_pwarp(
     const auto rows_per_block = block_size / SYM_PWARP_SIZE;
     const auto total_table_size = table_size * rows_per_block;
 
-    auto* s_tables = smem;
-    auto* s_nnzs = smem + total_table_size;
+    auto* s_tables = reinterpret_cast<std::int32_t*>(smem);
+    auto* s_nnzs = s_tables + total_table_size;
 
     for (auto i = tib; i < total_table_size; i += block_size)
         s_tables[i] = -1;
@@ -83,14 +84,14 @@ __global__ void k_sym_smem(const __grid_constant__ std::int32_t table_size,
                            const __grid_constant__ std::int32_t* const __restrict__ b_col,
                            const __grid_constant__ std::int32_t* const __restrict__ bins,
                            __grid_constant__ std::int32_t* const __restrict__ nnzs) {
-    extern __shared__ std::int32_t smem[];
+    extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
-    auto* s_table = smem;
+    auto* s_table = reinterpret_cast<std::int32_t*>(smem);
     auto* s_nnz = s_table + table_size;
 
     for (auto i = tib; i < table_size; i += block_size)
@@ -135,14 +136,14 @@ __global__ void k_sym_smem_max(
     __grid_constant__ std::int32_t* const __restrict__ nnzs,
     __grid_constant__ std::int32_t* const __restrict__ fail_bin,
     __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
-    extern __shared__ std::int32_t smem[];
+    extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto& block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
-    auto* s_table = smem;
+    auto* s_table = reinterpret_cast<std::int32_t*>(smem);
     auto* s_nnz = s_table + table_size;
 
     for (auto i = tib; i < table_size; i += block_size)

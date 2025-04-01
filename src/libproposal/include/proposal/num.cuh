@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cuda/std/cstddef>
 
 #include <cooperative_groups.h>
 #include <cooperative_groups/memcpy_async.h>
@@ -47,7 +48,7 @@ __global__ void k_num_smem_pwarp(
     const __grid_constant__ std::int32_t* const __restrict__ bins,
     const __grid_constant__ std::int32_t bin_size,
     __grid_constant__ T* const __restrict__ c_val) {
-    extern __shared__ T smem[];
+    extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
@@ -61,8 +62,8 @@ __global__ void k_num_smem_pwarp(
     const auto rows_per_block = block_size / NUM_PWARP_SIZE;
     const auto total_table_size = table_size * rows_per_block;
 
-    auto* s_vals_all = static_cast<T*>(smem);
-    auto* s_cols_all = reinterpret_cast<std::int32_t*>(smem + total_table_size);
+    auto* s_vals_all = reinterpret_cast<T*>(smem);
+    auto* s_cols_all = reinterpret_cast<std::int32_t*>(s_vals_all + total_table_size);
     auto* s_vals = s_vals_all + (pib * table_size);
     auto* s_cols = s_cols_all + static_cast<ptrdiff_t>(pib * table_size);
 
@@ -105,15 +106,15 @@ __global__ void k_num_smem(const __grid_constant__ std::int32_t table_size,
                            const __grid_constant__ std::int32_t* const __restrict__ c_col,
                            const __grid_constant__ std::int32_t* const __restrict__ bins,
                            __grid_constant__ T* const __restrict__ c_val) {
-    extern __shared__ T smem[];
+    extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto block_size = gsl::narrow_cast<std::int32_t>(block.num_threads());
 
-    auto* s_vals = static_cast<T*>(smem);
-    auto* s_cols = reinterpret_cast<std::int32_t*>(smem + table_size);
+    auto* s_vals = reinterpret_cast<T*>(smem);
+    auto* s_cols = reinterpret_cast<std::int32_t*>(s_vals + table_size);
 
     const auto row = bins[grid.block_rank()];
     const auto c_offset = c_rpt[row];

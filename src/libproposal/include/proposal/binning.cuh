@@ -4,6 +4,7 @@
 #include <concepts>
 #include <cstdint>
 #include <cuda/std/concepts>
+#include <cuda/std/cstddef>
 
 #include <cooperative_groups.h>
 #include <cub/cub.cuh>
@@ -36,7 +37,9 @@ __global__ void k_binning1(
     const __grid_constant__ std::int32_t m,
     __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
     GetValueF get_value) {
-    extern __shared__ std::int32_t s_bin_sizes[];
+    extern __shared__ cuda::std::byte smem[];
+
+    auto* s_bin_sizes = reinterpret_cast<std::int32_t*>(smem);
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
@@ -66,8 +69,9 @@ __global__ void k_binning2(
     __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
     __grid_constant__ std::int32_t* const __restrict__ bins,
     GetValueF get_value) {
-    extern __shared__ std::int32_t smem[];
-    auto* s_bin_sizes = smem;
+    extern __shared__ cuda::std::byte smem[];
+
+    auto* s_bin_sizes = reinterpret_cast<std::int32_t*>(smem);
     auto* s_bin_offsets = s_bin_sizes + n_bins;
 
     const auto grid = cg::this_grid();
