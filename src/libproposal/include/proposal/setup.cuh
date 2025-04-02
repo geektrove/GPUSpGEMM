@@ -32,9 +32,8 @@ __global__ void k_compute_nip(
     const auto block = cg::this_thread_block();
     const auto warp = cg::tiled_partition<WARP_SIZE>(block);
     const auto tile = cg::tiled_partition<BLOCK_SIZE>(block);
-
-    const auto& tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
-    const auto& tiw = gsl::narrow_cast<std::int32_t>(warp.thread_rank());
+    const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
+    const auto tiw = gsl::narrow_cast<std::int32_t>(warp.thread_rank());
 
     const auto row_length = tig < m ? a_rpt[tig + 1] - a_rpt[tig] : 0;
     const auto row_length_max = cg::reduce(warp, row_length, cg::greater<std::int32_t>{});
