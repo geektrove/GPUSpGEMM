@@ -10,7 +10,6 @@ struct Meta {
     std::array<cudaEvent_t, N_CUDA_EVENTS> events{};        // size 1
     std::array<cudaStream_t, Params::MAX_N_BINS> streams{}; // size n_bins
 
-    // std::int32_t n_bins{};
     std::size_t cub_storage_size{};
     std::size_t mem_pool_size{};
 
