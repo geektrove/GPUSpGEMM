@@ -105,16 +105,12 @@ __host__ consteval auto get_ranges() {
 template<BinningType BinType>
 __device__ consteval auto get_ranges() {
 #ifdef __CUDA_ARCH__
-#if __CUDA_ARCH__ == 860
     if constexpr (BinType == BinningType::SYM1) {
-        return Parameters<CC86>::SYM1_RANGES;
+        return Parameters<__CUDA_ARCH__>::SYM1_RANGES;
     } else if constexpr (BinType == BinningType::SYM2) {
-        return Parameters<CC86>::SYM2_RANGES;
+        return Parameters<__CUDA_ARCH__>::SYM2_RANGES;
     } else if constexpr (BinType == BinningType::NUM) {
-        return Parameters<CC86>::NUM_RANGES;
+        return Parameters<__CUDA_ARCH__>::NUM_RANGES;
     }
-#else
-#error "Unsupported compute capability"
-#endif
 #endif
 }
