@@ -75,7 +75,7 @@ __global__ void k_binning2(
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     if (tib < N_BINS)
         s_bin_sizes[tib] = 0;
@@ -104,13 +104,15 @@ __global__ void k_binning2(
 
 template<typename Params, std::int32_t N_BINS>
 inline void small_binning(const std::int32_t m, Meta<Params>& meta) {
+    NVTX3_FUNC_RANGE();
+
     // Perform iota operation to fill the smallest bin with row indices
     utils::handle_cuda_error(
         cub::DeviceFor::Bulk(meta.d_cub_storage,
                              meta.cub_storage_size,
                              m,
-                             [d_bins = meta.d_bins] __device__(int i) {
-                                 d_bins[i] = gsl::narrow_cast<std::int32_t>(i);
+                             [bins = meta.d_bins] __device__(int i) {
+                                 bins[i] = gsl::narrow_cast<std::int32_t>(i);
                              }));
 
     // Set bin sizes and offsets
@@ -159,11 +161,12 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     for (int i = 0; i + 1 < N_BINS; i++)
         meta.h_bin_offsets[i + 1] = meta.h_bin_offsets[i] + meta.h_bin_sizes[i];
 
-    SPDLOG_DEBUG("Bin sizes");
-    SPDLOG_DEBUG("{:>12s} {:>12s}", "Bin", "Size");
-    for (std::int32_t i = 0; i < N_BINS; i++) {
-        SPDLOG_DEBUG("{:12d} {:12d}", i, meta.h_bin_sizes[i]);
-    }
+    SPDLOG_DEBUG("{:>12s} {:>12s} {:>12s}", "Bin", "Size", "Offset");
+    for (std::int32_t i = 0; i < N_BINS; i++)
+        SPDLOG_DEBUG("{:12d} {:12d} {:>12d}",
+                     i,
+                     meta.h_bin_sizes[i],
+                     meta.h_bin_offsets[i]);
 
     utils::memcpy_async(meta.d_bin_offsets,
                         meta.h_bin_offsets,
