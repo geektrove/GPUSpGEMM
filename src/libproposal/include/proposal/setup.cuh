@@ -81,7 +81,7 @@ __global__ void k_compute_nip(
 }
 
 template<typename Params>
-inline void allocate_device_mem(const std::int32_t m, Meta<Params>& meta) {
+void allocate_device_mem(const std::int32_t m, Meta<Params>& meta) {
     // Estimate CUB storage size
     size_t cub_requested{};
     cub::DeviceFor::Bulk(nullptr, cub_requested, m, [] __device__(int) {});

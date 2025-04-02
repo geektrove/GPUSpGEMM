@@ -102,7 +102,7 @@ __global__ void k_binning2(
 }
 
 template<typename Params, std::int32_t N_BINS>
-inline void small_binning(const std::int32_t m, Meta<Params>& meta) {
+void small_binning(const std::int32_t m, Meta<Params>& meta) {
     NVTX3_FUNC_RANGE();
 
     // Perform iota operation to fill the smallest bin with row indices
