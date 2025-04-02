@@ -107,7 +107,7 @@ inline void allocate_device_mem(const std::int32_t m, Meta<Params>& meta) {
 
     // Assign pointers to the allocated memory
     meta.d_bins = static_cast<std::int32_t*>(meta.d_ptr);
-    meta.d_bin_sizes = meta.d_bins + Params::MAX_N_BINS;
+    meta.d_bin_sizes = meta.d_bins + m;
     meta.d_bin_offsets = meta.d_bin_sizes + Params::MAX_N_BINS;
     meta.d_max_row_nnz = meta.d_bin_offsets + Params::MAX_N_BINS;
     meta.d_total_nnz = meta.d_max_row_nnz + 1;
