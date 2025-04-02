@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cuda/std/cstddef>
 #include <cuda/std/functional>
+#include <type_traits>
 
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
@@ -18,10 +19,11 @@
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 #include <proposal/parameters.cuh>
+#include <proposal/utils.cuh>
 
 namespace cg = cooperative_groups;
 
-template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
+template<std::int32_t BLOCK_SIZE, std::int32_t PWARP_SIZE, std::int32_t TOTAL_TABLE_SIZE>
 __global__ void k_sym1_smem_pwarp(
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ a_col,
@@ -31,22 +33,23 @@ __global__ void k_sym1_smem_pwarp(
     const __grid_constant__ std::int32_t bin_size,
     __grid_constant__ std::int32_t* const __restrict__ nnzs) {
     static_assert(utils::ispow2(BLOCK_SIZE));
-    static_assert(utils::ispow2(TABLE_SIZE));
-    static_assert(utils::ispow2(SYM_PWARP_SIZE));
-    static_assert(SYM_PWARP_SIZE <= WARP_SIZE);
+    static_assert(utils::ispow2(TOTAL_TABLE_SIZE));
+    static_assert(utils::ispow2(PWARP_SIZE));
+    static_assert(PWARP_SIZE <= WARP_SIZE);
 
-    static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE, SYM_PWARP_SIZE);
-    static constexpr auto TOTAL_TABLE_SIZE = TABLE_SIZE * ROWS_PER_BLOCK;
+    static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE, PWARP_SIZE);
+    static constexpr auto TABLE_SIZE = utils::divpow2(TOTAL_TABLE_SIZE, ROWS_PER_BLOCK);
+    static_assert(TOTAL_TABLE_SIZE % ROWS_PER_BLOCK == 0);
 
     extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto tile = cg::tiled_partition<SYM_PWARP_SIZE>(block);
+    const auto tile = cg::tiled_partition<PWARP_SIZE>(block);
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
-    const auto tip = utils::modpow2(tib, SYM_PWARP_SIZE);
-    const auto pib = utils::divpow2(tib, SYM_PWARP_SIZE);
+    const auto tip = utils::modpow2(tib, PWARP_SIZE);
+    const auto pib = utils::divpow2(tib, PWARP_SIZE);
 
     auto* s_tables = reinterpret_cast<std::int32_t*>(smem);
 
@@ -54,15 +57,16 @@ __global__ void k_sym1_smem_pwarp(
         s_tables[i] = HASH_EMPTY;
     block.sync();
 
-    const auto row_id = utils::divpow2(tig, SYM_PWARP_SIZE);
+    const auto row_id = utils::divpow2(tig, PWARP_SIZE);
     if (row_id >= bin_size)
         return;
 
     auto* s_table = s_tables + (static_cast<ptrdiff_t>(pib * TABLE_SIZE));
     const auto row = bins[row_id];
+    assert(nnzs[row] <= TABLE_SIZE);
 
     auto l_nnz = 0;
-    for (auto i = a_rpt[row] + tip; i < a_rpt[row + 1]; i += SYM_PWARP_SIZE) {
+    for (auto i = a_rpt[row] + tip; i < a_rpt[row + 1]; i += PWARP_SIZE) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
             const auto key = b_col[k];
@@ -110,6 +114,7 @@ __global__ void k_sym1_smem(
     block.sync();
 
     const auto row = bins[grid.block_rank()];
+    assert(nnzs[row] <= TABLE_SIZE);
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
@@ -222,6 +227,7 @@ __global__ void k_sym1_global(
     cg::invoke_one(block, [&] { s_nnz = 0; });
 
     const auto row = bins[grid.block_rank()];
+    assert(nnzs[row] <= table_size);
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
@@ -260,7 +266,7 @@ void sym1(const utils::DeviceCSR<T>& A,
     static constexpr auto IdxByteSize = gsl::narrow_cast<std::int32_t>(
         sizeof(std::int32_t));
 
-    // Handle the largest bin first as it may fail to fit in the shared memory
+    // Handle max smem bin first as it may fail to fit in the shared memory
     const auto max_smem_bin_size = meta.h_bin_sizes[Params::SYM1_MAX_SMEM_BIN];
     std::int32_t h_fail_bin_size{};
     std::int32_t* d_fail_bin{};
@@ -316,52 +322,69 @@ void sym1(const utils::DeviceCSR<T>& A,
                             meta.streams[Params::SYM1_MAX_SMEM_BIN]);
     }
 
-    // Handle the rest of the bins
-    // utils::handle_cuda_error(
-    //     cudaFuncSetAttribute(k_sym1_smem,
-    //                          cudaFuncAttributeMaxDynamicSharedMemorySize,
-    //                          (meta.table_sizes[meta.n_bins - 3] + 1) * IdxByteSize));
-    // for (std::int32_t i = meta.n_bins - 3; i > 0; i--) {
-    //     SPDLOG_DEBUG("SYM1 bin {} size is {}", i, meta.h_bin_sizes[i]);
-    //     if (meta.h_bin_sizes[i] > 0) {
-    //         utils::launch_kernel(k_sym1_smem,
-    //                              meta.h_bin_sizes[i],
-    //                              meta.block_sizes[i],
-    //                              (meta.table_sizes[i] + 1) * IdxByteSize,
-    //                              meta.streams[i],
-    //                              meta.table_sizes[i],
-    //                              A.rpt,
-    //                              A.col,
-    //                              B.rpt,
-    //                              B.col,
-    //                              meta.d_bins + meta.h_bin_offsets[i],
-    //                              C.rpt);
-    //     }
-    // }
-    // SPDLOG_DEBUG("SYM1 bin {} size is {}", , meta.h_bin_sizes[0]);
-    // if (meta.h_bin_sizes[0] > 0) {
-    //     const auto rows_per_block = utils::divpow2(meta.block_sizes[0], SYM_PWARP_SIZE);
-    //     const auto smem = (meta.table_sizes[0] + rows_per_block) * IdxByteSize;
-    //     utils::handle_cuda_error(
-    //         cudaFuncSetAttribute(k_sym1_smem_pwarp,
-    //                              cudaFuncAttributeMaxDynamicSharedMemorySize,
-    //                              smem));
-    //     utils::launch_kernel(k_sym1_smem_pwarp,
-    //                          cuda::ceil_div(meta.h_bin_sizes[0], rows_per_block),
-    //                          meta.block_sizes[0],
-    //                          smem,
-    //                          meta.streams[0],
-    //                          utils::divpow2(meta.table_sizes[0], rows_per_block),
-    //                          A.rpt,
-    //                          A.col,
-    //                          B.rpt,
-    //                          B.col,
-    //                          meta.d_bins + meta.h_bin_offsets[0],
-    //                          meta.h_bin_sizes[0],
-    //                          C.rpt);
-    // }
+    // Handle smem bins
+    constexpr_for<Params::SYM1_SMEM_BIN_BEGIN, Params::SYM1_PWARP_BIN, -1>(
+        [&]<std::int32_t I>(std::integral_constant<std::int32_t, I> ARG) {
+            static constexpr auto BIN = ARG.value;
+            static constexpr auto smem = (Params::SYM1_TABLE_SIZES[BIN] + 1)
+                                         * IdxByteSize;
+            SPDLOG_DEBUG("SYM1 bin {} size is {}", BIN, meta.h_bin_sizes[BIN]);
+            if (meta.h_bin_sizes[BIN] == 0)
+                return;
+            utils::handle_cuda_error(cudaFuncSetAttribute(
+                k_sym1_smem<Params::SYM1_BLOCK_SIZES[BIN], Params::SYM1_TABLE_SIZES[BIN]>,
+                cudaFuncAttributeMaxDynamicSharedMemorySize,
+                smem));
+            utils::launch_kernel(
+                k_sym1_smem<Params::SYM1_BLOCK_SIZES[BIN], Params::SYM1_TABLE_SIZES[BIN]>,
+                meta.h_bin_sizes[BIN],
+                Params::SYM1_BLOCK_SIZES[BIN],
+                smem,
+                meta.streams[BIN],
+                A.rpt,
+                A.col,
+                B.rpt,
+                B.col,
+                meta.d_bins + meta.h_bin_offsets[BIN],
+                C.rpt);
+        });
 
-    // Handle the fail bin
+    // Handle pwarp bin
+    SPDLOG_DEBUG("SYM1 bin {} size is {}",
+                 Params::SYM1_PWARP_BIN,
+                 meta.h_bin_sizes[Params::SYM1_PWARP_BIN]);
+    if (meta.h_bin_sizes[Params::SYM1_PWARP_BIN] > 0) {
+        static constexpr auto BLOCK_SIZE =
+            Params::SYM1_BLOCK_SIZES[Params::SYM1_PWARP_BIN];
+        static constexpr auto TABLE_SIZE =
+            Params::SYM1_TABLE_SIZES[Params::SYM1_PWARP_BIN];
+        static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE,
+                                                              Params::SYM1_PWARP_SIZE);
+        static constexpr auto smem = TABLE_SIZE * IdxByteSize;
+        utils::handle_cuda_error(cudaFuncSetAttribute(
+            k_sym1_smem_pwarp<BLOCK_SIZE, Params::SYM1_PWARP_SIZE, TABLE_SIZE>,
+            cudaFuncAttributeMaxDynamicSharedMemorySize,
+            smem));
+
+        SPDLOG_DEBUG("Bin offset: {}", meta.h_bin_offsets[Params::SYM1_PWARP_BIN]);
+        SPDLOG_DEBUG("Bin size: {}", meta.h_bin_sizes[Params::SYM1_PWARP_BIN]);
+
+        utils::launch_kernel(
+            k_sym1_smem_pwarp<BLOCK_SIZE, Params::SYM1_PWARP_SIZE, TABLE_SIZE>,
+            cuda::ceil_div(meta.h_bin_sizes[Params::SYM1_PWARP_BIN], ROWS_PER_BLOCK),
+            BLOCK_SIZE,
+            smem,
+            meta.streams[Params::SYM1_PWARP_BIN],
+            A.rpt,
+            A.col,
+            B.rpt,
+            B.col,
+            meta.d_bins + meta.h_bin_offsets[Params::SYM1_PWARP_BIN],
+            meta.h_bin_sizes[Params::SYM1_PWARP_BIN],
+            C.rpt);
+    }
+
+    // Handle fail bin
     if (max_smem_bin_size > 0) {
         utils::stream_sync(meta.streams[Params::SYM1_MAX_SMEM_BIN]);
         SPDLOG_DEBUG("SYM1 fail bin size is {}", h_fail_bin_size);
@@ -391,10 +414,10 @@ void sym1(const utils::DeviceCSR<T>& A,
     }
 
     // Wait for all bins to finish
-    for (std::int32_t i = 0; i + 1 < Params::SYM1_N_BINS; i++)
+    for (std::int32_t i = 0; i < Params::SYM1_N_BINS; i++)
         utils::stream_sync(meta.streams[i]);
 
-    // No need to wait for the fail bin deallocation
+    // No need to wait for fail bin deallocation
     if (d_fail_bin != nullptr && d_fail_bin != meta.d_cub_storage)
         utils::free_async(d_fail_bin, meta.streams[Params::SYM1_GLOBAL_MEM_BIN]);
 
