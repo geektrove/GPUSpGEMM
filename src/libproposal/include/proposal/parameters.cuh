@@ -4,16 +4,13 @@
 #include <cstdint>
 #include <cuda/std/array>
 
+inline constexpr std::int32_t N_CUDA_EVENTS = 1;
+inline constexpr std::int32_t WARP_SIZE = 32;
 inline constexpr std::int32_t HASH_EMPTY = -1;
 inline constexpr std::int32_t HASH_SCALE = 107;
 inline constexpr double SYM_RANGE_RATIO = 1 / 1.2;
-inline constexpr std::int32_t SYM_PWARP_SIZE = 4;
-inline constexpr std::int32_t NUM_PWARP_SIZE = 8;
-inline constexpr std::int32_t N_CUDA_EVENTS = 1;
 
-inline constexpr std::int32_t WARP_SIZE = 32;
-
-inline constexpr std::int32_t CC86 = 86;
+inline constexpr std::int32_t CC86 = 860;
 
 template<std::int32_t ComputeCapability>
 struct Parameters;
@@ -69,10 +66,15 @@ struct Parameters<CC86> {
 
     static constexpr std::int32_t NUM_N_BINS = 6;
 
+    static constexpr std::int32_t NUM_PWARP_BIN = 0;
+    static constexpr std::int32_t NUM_PWARP_SIZE = 8;
+    static constexpr std::int32_t NUM_SMEM_BIN_BEGIN = 4;
+    static constexpr std::int32_t NUM_GLOBAL_MEM_BIN = 5;
+
     using NUM_CUDA_ARRAY = cuda::std::array<std::int32_t, NUM_N_BINS>;
     static constexpr NUM_CUDA_ARRAY NUM_BLOCK_SIZES = {512, 128, 256, 512, 1024, 1024};
-    static constexpr NUM_CUDA_ARRAY NUM_TABLE_SIZES =
-        {2758, 624, 1336, 2758, 8448, INT32_MAX};
+    static constexpr NUM_CUDA_ARRAY NUM_ARRAY_SIZES =
+        {2752, 624, 1336, 2758, 8448, INT32_MAX};
     static constexpr NUM_CUDA_ARRAY NUM_RANGES = {43, 624, 1336, 2758, 8448, INT32_MAX};
 
     //
