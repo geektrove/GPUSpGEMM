@@ -15,7 +15,6 @@
 
 #include <utils/utils.cuh>
 
-#include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 #include <proposal/parameters.cuh>
 

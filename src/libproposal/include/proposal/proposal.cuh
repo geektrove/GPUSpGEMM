@@ -10,7 +10,6 @@
 
 #include <proposal/binning.cuh>
 #include <proposal/cleanup.cuh>
-#include <proposal/device.cuh>
 #include <proposal/meta.cuh>
 #include <proposal/num.cuh>
 #include <proposal/setup.cuh>
