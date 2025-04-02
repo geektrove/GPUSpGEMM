@@ -13,21 +13,20 @@
 #include <proposal/meta.cuh>
 #include <proposal/num.cuh>
 #include <proposal/setup.cuh>
-#include <proposal/sym.cuh>
+#include <proposal/sym1.cuh>
 #include <proposal/sym2.cuh>
 
-template<std::floating_point T>
-auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
+template<std::floating_point T, typename Params>
+auto proposal_inner(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     -> utils::DeviceCSR<T> {
     NVTX3_FUNC_RANGE();
 
     utils::DeviceCSR<T> C;
-    Meta meta;
-    Device device;
+    Meta<Params> meta;
 
     // Setup
     SPDLOG_DEBUG("Starting setup phase");
-    setup(A, B, C, meta, device);
+    setup<T, Params>(A, B, C, meta);
     SPDLOG_DEBUG("Finished setup phase");
 
     // Symbolic binning
@@ -35,12 +34,12 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     auto get_value_individual = [values = C.rpt] __device__(const std::int32_t row) {
         return values[row];
     };
-    binning(C, meta, device, get_value_individual);
+    binning<T, Params, BinningType::SYM1>(C, meta, get_value_individual);
     SPDLOG_DEBUG("Finished symbolic binning phase");
 
     // Symbolic
     SPDLOG_DEBUG("Starting symbolic phase");
-    sym(A, B, C, meta);
+    sym1<T, Params>(A, B, C, meta);
     SPDLOG_DEBUG("Finished symbolic phase");
 
     // Symbolic binning 2
@@ -48,23 +47,22 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     auto get_value_difference = [values = C.rpt] __device__(const std::int32_t row) {
         return values[row + 1] - values[row];
     };
-    sym_binning2(C, meta, device, get_value_difference);
+    sym_binning2(C, meta, get_value_difference);
     SPDLOG_DEBUG("Finished symbolic binning 2 phase");
 
     // Symbolic 2
     SPDLOG_DEBUG("Starting symbolic 2 phase");
-    sym2(A, B, C, meta, device);
+    sym2<T, Params>(A, B, C, meta);
     SPDLOG_DEBUG("Finished symbolic 2 phase");
 
     // Numeric binning
     SPDLOG_DEBUG("Starting numeric binning phase");
-
-    binning(C, meta, device, get_value_difference);
+    binning<T, Params, BinningType::NUM>(C, meta, get_value_difference);
     SPDLOG_DEBUG("Finished numeric binning phase");
 
     // Numeric
     SPDLOG_DEBUG("Starting numeric phase");
-    num(A, B, C, meta);
+    num<T, Params>(A, B, C, meta);
     SPDLOG_DEBUG("Finished numeric phase");
 
     // Cleanup
@@ -73,4 +71,30 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     SPDLOG_DEBUG("Finished cleanup phase");
 
     return C;
+}
+
+template<std::floating_point T>
+auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
+    -> utils::DeviceCSR<T> {
+    NVTX3_FUNC_RANGE();
+
+    const auto CC = std::invoke([&] {
+        static constexpr std::int32_t MAJOR_SHIFT = 100;
+        static constexpr std::int32_t MINOR_SHIFT = 10;
+
+        int device{};
+        utils::handle_cuda_error(cudaGetDevice(&device));
+        int major{};
+        int minor{};
+        utils::handle_cuda_error(
+            cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        utils::handle_cuda_error(
+            cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+        return (major * MAJOR_SHIFT) + (minor * MINOR_SHIFT);
+    });
+
+    if (CC == CC86) {
+        return proposal_inner<T, Parameters<CC86>>(A, B);
+    }
+    throw std::runtime_error("Unsupported compute capability");
 }
