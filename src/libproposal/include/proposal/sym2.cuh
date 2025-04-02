@@ -1,22 +1,29 @@
 #pragma once
 
+#include <cassert>
 #include <concepts>
 #include <cstdint>
 #include <cstdlib>
+#include <cuda/std/cstddef>
+#include <cuda/std/functional>
 
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
 #include <gsl/gsl-lite.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 
 #include <utils/utils.cuh>
 
-#include <proposal/definitions.cuh>
 #include <proposal/device.cuh>
 #include <proposal/meta.cuh>
+#include <proposal/parameters.cuh>
 #include <proposal/utils.cuh>
 
+namespace cg = cooperative_groups;
+
+template<std::int32_t BLOCK_SIZE, std::int32_t PWARP_SIZE, std::int32_t TOTAL_TABLE_SIZE>
 __global__ void k_sym2_smem_pwarp(
-    const __grid_constant__ std::int32_t table_size,
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ a_col,
     const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
@@ -24,201 +31,428 @@ __global__ void k_sym2_smem_pwarp(
     const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ bins,
     const __grid_constant__ std::int32_t bin_size,
-    __grid_constant__ std::int32_t* const __restrict__ c_col);
+    __grid_constant__ std::int32_t* const __restrict__ c_col) {
+    static_assert(utils::ispow2(BLOCK_SIZE));
+    static_assert(utils::ispow2(TOTAL_TABLE_SIZE));
+    static_assert(utils::ispow2(PWARP_SIZE));
+    static_assert(PWARP_SIZE <= WARP_SIZE);
 
+    static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE, PWARP_SIZE);
+    static constexpr auto TABLE_SIZE = utils::divpow2(TOTAL_TABLE_SIZE, ROWS_PER_BLOCK);
+    static_assert(TOTAL_TABLE_SIZE % ROWS_PER_BLOCK == 0);
+
+    extern __shared__ cuda::std::byte smem[];
+
+    const auto grid = cg::this_grid();
+    const auto block = cg::this_thread_block();
+    const auto tile = cg::tiled_partition<PWARP_SIZE>(block);
+    const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto tip = utils::modpow2(tib, PWARP_SIZE);
+    const auto pib = utils::divpow2(tib, PWARP_SIZE);
+
+    auto* s_tables = reinterpret_cast<std::int32_t*>(smem);
+    auto* s_offsets = s_tables + TOTAL_TABLE_SIZE;
+
+    for (auto i = tib; i < TOTAL_TABLE_SIZE; i += BLOCK_SIZE)
+        s_tables[i] = HASH_EMPTY;
+    if (tib < ROWS_PER_BLOCK)
+        s_offsets[tib] = 0;
+    block.sync();
+
+    const auto row_id = utils::divpow2(tig, PWARP_SIZE);
+    if (row_id >= bin_size)
+        return;
+
+    auto* s_table = s_tables + static_cast<ptrdiff_t>(pib * TABLE_SIZE);
+    auto* s_offset = s_offsets + pib;
+    const auto row = bins[row_id];
+    assert(c_rpt[row + 1] - c_rpt[row] <= TABLE_SIZE);
+
+    // Aggregate the column indices in the hash table
+    for (auto i = a_rpt[row] + tip; i < a_rpt[row + 1]; i += PWARP_SIZE) {
+        const auto colrow = a_col[i];
+        for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
+            const auto key = b_col[k];
+            auto hash = utils::modpow2(key * HASH_SCALE, TABLE_SIZE);
+            while (true) {
+                const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY || old == key)
+                    break;
+                hash = utils::modpow2(hash + 1, TABLE_SIZE);
+            }
+        }
+    }
+    tile.sync();
+
+    // Condense the column indices
+    for (auto offset = 0; offset < TABLE_SIZE; offset += PWARP_SIZE) {
+        const auto i = offset + tip;
+        const auto col = i < TABLE_SIZE ? s_table[i] : HASH_EMPTY;
+        tile.sync();
+        if (col != HASH_EMPTY)
+            s_table[atomicAdd_block(s_offset, 1)] = col;
+    }
+    tile.sync();
+
+    // Write the column indices to the output
+    const auto c_offset = c_rpt[row];
+    const auto nnz = c_rpt[row + 1] - c_offset;
+    for (auto i = tip; i < nnz; i += PWARP_SIZE) {
+        const auto col = s_table[i];
+        std::int32_t n_less = 0;
+        for (std::int32_t j = 0; j < nnz; j++) {
+            if (s_table[j] < col)
+                n_less++;
+        }
+        c_col[c_offset + n_less] = col;
+    }
+}
+
+template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
 __global__ void k_sym2_smem(
-    const __grid_constant__ std::int32_t table_size,
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ a_col,
     const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ b_col,
     const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ bins,
-    __grid_constant__ std::int32_t* const __restrict__ c_col);
+    __grid_constant__ std::int32_t* const __restrict__ c_col) {
+    static_assert(utils::ispow2(TABLE_SIZE));
 
+    extern __shared__ cuda::std::byte smem[];
+
+    const auto grid = cg::this_grid();
+    const auto block = cg::this_thread_block();
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+
+    auto* s_table = reinterpret_cast<std::int32_t*>(smem);
+    auto* s_offset = s_table + TABLE_SIZE;
+
+    for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
+        s_table[i] = HASH_EMPTY;
+    cg::invoke_one(block, [&] { *s_offset = 0; });
+    block.sync();
+
+    // Aggregate the column indices in the hash table
+    const auto row = bins[grid.block_rank()];
+    assert(c_rpt[row + 1] - c_rpt[row] <= TABLE_SIZE);
+    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
+    const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
+    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
+    const auto k_step = WARP_SIZE;
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+        const auto colrow = a_col[i];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+            const auto key = b_col[k];
+            auto hash = utils::modpow2(key * HASH_SCALE, TABLE_SIZE);
+            while (true) {
+                const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY || old == key)
+                    break;
+                hash = utils::modpow2(hash + 1, TABLE_SIZE);
+            }
+        }
+    }
+    block.sync();
+
+    // Condense the column indices
+    for (auto offset = 0; offset < TABLE_SIZE; offset += BLOCK_SIZE) {
+        const auto i = offset + tib;
+        const auto col = i < TABLE_SIZE ? s_table[i] : HASH_EMPTY;
+        block.sync();
+        if (col != HASH_EMPTY)
+            s_table[atomicAdd_block(s_offset, 1)] = col;
+    }
+    block.sync();
+
+    // Write the column indices to the output
+    const auto c_offset = c_rpt[row];
+    const auto nnz = c_rpt[row + 1] - c_offset;
+    for (auto i = tib; i < nnz; i += BLOCK_SIZE) {
+        const auto col = s_table[i];
+        std::int32_t n_less = 0;
+        for (std::int32_t j = 0; j < nnz; j++) {
+            if (s_table[j] < col)
+                n_less++;
+        }
+        c_col[c_offset + n_less] = col;
+    }
+}
+
+template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
 __global__ void k_sym2_smem_max(
-    const __grid_constant__ std::int32_t table_size,
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ a_col,
     const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ b_col,
     const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ bins,
-    __grid_constant__ std::int32_t* const __restrict__ c_col);
+    __grid_constant__ std::int32_t* const __restrict__ c_col) {
+    extern __shared__ cuda::std::byte smem[];
 
+    const auto grid = cg::this_grid();
+    const auto block = cg::this_thread_block();
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+
+    auto* s_table = reinterpret_cast<std::int32_t*>(smem);
+    auto* s_offset = s_table + TABLE_SIZE;
+
+    for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
+        s_table[i] = HASH_EMPTY;
+    cg::invoke_one(block, [&] { *s_offset = 0; });
+    block.sync();
+
+    // Aggregate the column indices in the hash table
+    const auto row = bins[grid.block_rank()];
+    assert(c_rpt[row + 1] - c_rpt[row] <= TABLE_SIZE);
+    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
+    const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
+    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
+    const auto k_step = WARP_SIZE;
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+        const auto colrow = a_col[i];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+            const auto key = b_col[k];
+            auto hash = (key * HASH_SCALE) % TABLE_SIZE;
+            while (true) {
+                const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY || old == key)
+                    break;
+                hash = hash + 1 < TABLE_SIZE ? hash + 1 : 0;
+            }
+        }
+    }
+    block.sync();
+
+    // Condense the column indices
+    for (auto offset = 0; offset < TABLE_SIZE; offset += BLOCK_SIZE) {
+        const auto i = offset + tib;
+        const auto col = i < TABLE_SIZE ? s_table[i] : HASH_EMPTY;
+        block.sync();
+        if (col != HASH_EMPTY)
+            s_table[atomicAdd_block(s_offset, 1)] = col;
+    }
+    block.sync();
+
+    // Write the column indices to the output
+    const auto c_offset = c_rpt[row];
+    const auto nnz = c_rpt[row + 1] - c_offset;
+    for (auto i = tib; i < nnz; i += BLOCK_SIZE) {
+        const auto col = s_table[i];
+        std::int32_t n_less = 0;
+        for (std::int32_t j = 0; j < nnz; j++) {
+            if (s_table[j] < col)
+                n_less++;
+        }
+        c_col[c_offset + n_less] = col;
+    }
+}
+
+template<std::int32_t BLOCK_SIZE>
 __global__ void k_sym2_global(
-    const __grid_constant__ std::int32_t table_size,
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ a_col,
     const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ b_col,
     const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
     const __grid_constant__ std::int32_t* const __restrict__ bins,
+    const __grid_constant__ std::int32_t table_size,
     __grid_constant__ std::int32_t* const __restrict__ tables,
-    __grid_constant__ std::int32_t* const __restrict__ c_col);
+    __grid_constant__ std::int32_t* const __restrict__ c_col) {
+    __shared__ std::int32_t s_offset;
 
-template<std::floating_point T>
+    const auto grid = cg::this_grid();
+    const auto block = cg::this_thread_block();
+    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+
+    auto* table = tables + (static_cast<ptrdiff_t>(grid.block_rank()) * table_size);
+    for (auto i = tib; i < table_size; i += BLOCK_SIZE)
+        table[i] = HASH_EMPTY;
+    cg::invoke_one(block, [&] { s_offset = 0; });
+    block.sync();
+
+    // Aggregate the column indices in the hash table
+    const auto row = bins[grid.block_rank()];
+    assert(c_rpt[row + 1] - c_rpt[row] <= table_size);
+    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
+    const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
+    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
+    const auto k_step = WARP_SIZE;
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+        const auto colrow = a_col[i];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+            const auto key = b_col[k];
+            auto hash = (key * HASH_SCALE) % table_size;
+            while (true) {
+                const auto old = atomicCAS_block(table + hash, HASH_EMPTY, key);
+                if (old == HASH_EMPTY || old == key)
+                    break;
+                hash = hash + 1 < table_size ? hash + 1 : 0;
+            }
+        }
+    }
+    block.sync();
+
+    // Condense the column indices
+    for (auto offset = 0; offset < table_size; offset += BLOCK_SIZE) {
+        const auto i = offset + tib;
+        const auto col = i < table_size ? table[i] : HASH_EMPTY;
+        block.sync();
+        if (col != HASH_EMPTY)
+            table[atomicAdd_block(&s_offset, 1)] = col;
+    }
+    block.sync();
+
+    // Write the column indices to the output
+    const auto c_offset = c_rpt[row];
+    const auto nnz = c_rpt[row + 1] - c_offset;
+    for (auto i = tib; i < nnz; i += BLOCK_SIZE) {
+        const auto col = table[i];
+        std::int32_t n_less = 0;
+        for (std::int32_t j = 0; j < nnz; j++) {
+            if (table[j] < col)
+                n_less++;
+        }
+        c_col[c_offset + n_less] = col;
+    }
+}
+
+template<std::floating_point T, typename Params>
 void sym2(const utils::DeviceCSR<T>& A,
           const utils::DeviceCSR<T>& B,
           utils::DeviceCSR<T>& C,
-          Meta& meta,
-          const Device& device) {
+          Meta<Params>& meta) {
     NVTX3_FUNC_RANGE();
 
     static constexpr auto IdxByteSize = gsl::narrow_cast<std::int32_t>(
         sizeof(std::int32_t));
 
-    // Handle the global memory bin
-    const auto gl_mem_bin_idx = meta.n_bins - 1;
-    SPDLOG_DEBUG("Sym2: bin {} size is {}",
-                 gl_mem_bin_idx,
-                 meta.h_bin_sizes[gl_mem_bin_idx]);
-    if (meta.h_bin_sizes[gl_mem_bin_idx] > 0) {
-        utils::launch_kernel(k_sym2_global,
-                             meta.h_bin_sizes[gl_mem_bin_idx],
-                             meta.block_sizes[gl_mem_bin_idx],
+    // Handle global memory bin
+    const auto global_mem_bin_size = meta.h_bin_sizes[Params::SYM2_GLOBAL_MEM_BIN];
+    SPDLOG_DEBUG("SYM2 bin {} size is {}",
+                 Params::SYM2_GLOBAL_MEM_BIN,
+                 meta.h_bin_sizes[Params::SYM2_GLOBAL_MEM_BIN]);
+    if (global_mem_bin_size > 0) {
+        static constexpr auto BLOCK_SIZE =
+            Params::SYM2_BLOCK_SIZES[Params::SYM2_GLOBAL_MEM_BIN];
+
+        const auto table_size = meta.h_max_row_nnz;
+        utils::launch_kernel(k_sym2_global<BLOCK_SIZE>,
+                             global_mem_bin_size,
+                             BLOCK_SIZE,
                              0,
-                             meta.streams[gl_mem_bin_idx],
-                             meta.table_sizes[gl_mem_bin_idx],
+                             meta.streams[Params::SYM2_GLOBAL_MEM_BIN],
                              A.rpt,
                              A.col,
                              B.rpt,
                              B.col,
                              C.rpt,
-                             meta.d_bins + meta.h_bin_offsets[gl_mem_bin_idx],
+                             meta.d_bins
+                                 + meta.h_bin_offsets[Params::SYM2_GLOBAL_MEM_BIN],
+                             table_size,
                              static_cast<std::int32_t*>(meta.d_mem_pool),
                              C.col);
     }
 
-    // Handle the max shared memory bin
-    const auto max_smem_bin_idx = meta.n_bins - 2;
-    SPDLOG_DEBUG("Sym2: bin {} size is {}",
-                 max_smem_bin_idx,
-                 meta.h_bin_sizes[max_smem_bin_idx]);
-    if (meta.h_bin_sizes[max_smem_bin_idx] > 0) {
-        const auto smem = (meta.table_sizes[max_smem_bin_idx] + 1) * IdxByteSize;
+    // Handle max smem bin
+    const auto max_smem_bin_size = meta.h_bin_sizes[Params::SYM2_MAX_SMEM_BIN];
+    SPDLOG_DEBUG("SYM2 bin {} size is {}", Params::SYM2_MAX_SMEM_BIN, max_smem_bin_size);
+    if (max_smem_bin_size > 0) {
+        static constexpr auto BLOCK_SIZE =
+            Params::SYM2_BLOCK_SIZES[Params::SYM2_MAX_SMEM_BIN];
+        static constexpr auto TABLE_SIZE =
+            Params::SYM2_TABLE_SIZES[Params::SYM2_MAX_SMEM_BIN];
+        static constexpr auto SMEM = (TABLE_SIZE + 1) * IdxByteSize;
+
         utils::handle_cuda_error(
-            cudaFuncSetAttribute(k_sym2_smem_max,
+            cudaFuncSetAttribute(k_sym2_smem_max<BLOCK_SIZE, TABLE_SIZE>,
                                  cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                 smem));
-        utils::launch_kernel(k_sym2_smem_max,
-                             meta.h_bin_sizes[max_smem_bin_idx],
-                             meta.block_sizes[max_smem_bin_idx],
-                             smem,
-                             meta.streams[max_smem_bin_idx],
-                             meta.table_sizes[max_smem_bin_idx],
+                                 SMEM));
+        utils::launch_kernel(k_sym2_smem_max<BLOCK_SIZE, TABLE_SIZE>,
+                             max_smem_bin_size,
+                             BLOCK_SIZE,
+                             SMEM,
+                             meta.streams[Params::SYM2_MAX_SMEM_BIN],
                              A.rpt,
                              A.col,
                              B.rpt,
                              B.col,
                              C.rpt,
-                             meta.d_bins + meta.h_bin_offsets[max_smem_bin_idx],
+                             meta.d_bins + meta.h_bin_offsets[Params::SYM2_MAX_SMEM_BIN],
                              C.col);
     }
 
-    // Handle the rest of the bins
-    utils::handle_cuda_error(
-        cudaFuncSetAttribute(k_sym2_smem,
-                             cudaFuncAttributeMaxDynamicSharedMemorySize,
-                             (meta.table_sizes[meta.n_bins - 3] + 1) * IdxByteSize));
-    for (std::int32_t i = meta.n_bins - 3; i > 0; i--) {
-        SPDLOG_DEBUG("Sym2: bin {} size is {}", i, meta.h_bin_sizes[i]);
-        if (meta.h_bin_sizes[i] > 0) {
-            utils::launch_kernel(k_sym2_smem,
-                                 meta.h_bin_sizes[i],
-                                 meta.block_sizes[i],
-                                 (meta.table_sizes[i] + 1) * IdxByteSize,
-                                 meta.streams[i],
-                                 meta.table_sizes[i],
+    // Handle smem bins
+    constexpr_for<Params::SYM2_SMEM_BIN_BEGIN, Params::SYM2_PWARP_BIN, -1>(
+        [&]<std::int32_t I>(std::integral_constant<std::int32_t, I> ARG) {
+            static constexpr auto BIN = ARG.value;
+            SPDLOG_DEBUG("SYM2 bin {} size is {}", BIN, meta.h_bin_sizes[BIN]);
+            if (meta.h_bin_sizes[BIN] == 0)
+                return;
+
+            static constexpr auto BLOCK_SIZE = Params::SYM2_BLOCK_SIZES[BIN];
+            static constexpr auto TABLE_SIZE = Params::SYM2_TABLE_SIZES[BIN];
+            static constexpr auto SMEM = (Params::SYM2_TABLE_SIZES[BIN] + 1)
+                                         * IdxByteSize;
+
+            utils::handle_cuda_error(
+                cudaFuncSetAttribute(k_sym2_smem<BLOCK_SIZE, TABLE_SIZE>,
+                                     cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                     SMEM));
+            utils::launch_kernel(k_sym2_smem<BLOCK_SIZE, TABLE_SIZE>,
+                                 meta.h_bin_sizes[BIN],
+                                 BLOCK_SIZE,
+                                 SMEM,
+                                 meta.streams[BIN],
                                  A.rpt,
                                  A.col,
                                  B.rpt,
                                  B.col,
                                  C.rpt,
-                                 meta.d_bins + meta.h_bin_offsets[i],
+                                 meta.d_bins + meta.h_bin_offsets[BIN],
                                  C.col);
-        }
-    }
-    SPDLOG_DEBUG("Sym2: bin 0 size is {}", meta.h_bin_sizes[0]);
-    if (meta.h_bin_sizes[0] > 0) {
-        const auto rows_per_block = utils::divpow2(meta.block_sizes[0], SYM_PWARP_SIZE);
-        const auto smem = (meta.table_sizes[0] + rows_per_block) * IdxByteSize;
+        });
+
+    // Handle pwarp bin
+    SPDLOG_DEBUG("SYM2 bin {} size is {}",
+                 Params::SYM2_PWARP_BIN,
+                 meta.h_bin_sizes[Params::SYM2_PWARP_BIN]);
+    if (meta.h_bin_sizes[Params::SYM2_PWARP_BIN] > 0) {
+        static constexpr auto BLOCK_SIZE =
+            Params::SYM2_BLOCK_SIZES[Params::SYM2_PWARP_BIN];
+        static constexpr auto TABLE_SIZE =
+            Params::SYM2_TABLE_SIZES[Params::SYM2_PWARP_BIN];
+        static constexpr auto PWARP_SIZE = Params::SYM2_PWARP_SIZE;
+        static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE, PWARP_SIZE);
+        static constexpr auto SMEM = TABLE_SIZE * IdxByteSize;
+
         utils::handle_cuda_error(
-            cudaFuncSetAttribute(k_sym2_smem_pwarp,
+            cudaFuncSetAttribute(k_sym2_smem_pwarp<BLOCK_SIZE, PWARP_SIZE, TABLE_SIZE>,
                                  cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                 smem));
-        utils::launch_kernel(k_sym2_smem_pwarp,
-                             cuda::ceil_div(meta.h_bin_sizes[0], rows_per_block),
-                             meta.block_sizes[0],
-                             smem,
-                             meta.streams[0],
-                             utils::divpow2(meta.table_sizes[0], rows_per_block),
-                             A.rpt,
-                             A.col,
-                             B.rpt,
-                             B.col,
-                             C.rpt,
-                             meta.d_bins + meta.h_bin_offsets[0],
-                             meta.h_bin_sizes[0],
-                             C.col);
+                                 SMEM));
+        utils::launch_kernel(
+            k_sym2_smem_pwarp<BLOCK_SIZE, PWARP_SIZE, TABLE_SIZE>,
+            cuda::ceil_div(meta.h_bin_sizes[Params::SYM2_PWARP_BIN], ROWS_PER_BLOCK),
+            BLOCK_SIZE,
+            SMEM,
+            meta.streams[Params::SYM2_PWARP_BIN],
+            A.rpt,
+            A.col,
+            B.rpt,
+            B.col,
+            C.rpt,
+            meta.d_bins + meta.h_bin_offsets[Params::SYM2_PWARP_BIN],
+            meta.h_bin_sizes[Params::SYM2_PWARP_BIN],
+            C.col);
     }
 
     // Allocate C.val
     auto* val_ptr = utils::malloc_async(C.nnz * sizeof(T));
     C.val = reinterpret_cast<T*>(val_ptr);
 
-    // Update the table sizes and ranges for numeric binning
-    auto calculate_num_table_size = [&](std::int32_t n_blocks) {
-        static constexpr auto ItemByteSize = gsl::narrow_cast<std::int32_t>(
-            sizeof(std::int32_t) + sizeof(T));
-        // Align column indices to 16 bytes to allow hardware accelerated
-        // async copy from global to shared memory
-        static constexpr std::int32_t SMEM_ALIGNMENT = 16;
-        static constexpr auto SMEM_ITEM_ALIGNMENT = SMEM_ALIGNMENT / sizeof(T);
-        auto smem = get_smem_size(device, n_blocks);
-        auto table_size = smem / ItemByteSize;
-        table_size = (table_size / SMEM_ITEM_ALIGNMENT) * SMEM_ITEM_ALIGNMENT;
-        return table_size;
-    };
-
-    meta.table_sizes[0] = calculate_num_table_size(device.max_threads_per_sm
-                                                   / meta.block_sizes[0]);
-    {
-        std::int32_t i = 1;
-        for (; meta.block_sizes[i] < device.max_threads_per_block; i++)
-            meta.table_sizes[i] = calculate_num_table_size(device.max_threads_per_sm
-                                                           / meta.block_sizes[i]);
-        for (auto n_blocks = device.max_threads_per_sm / device.max_threads_per_block;
-             n_blocks > 0;
-             n_blocks /= 2)
-            meta.table_sizes[i++] = calculate_num_table_size(n_blocks);
-        meta.table_sizes[i++] = calculate_num_table_size(1);
-        meta.table_sizes[i] = *meta.h_max_row_nnz;
-    }
-    meta.h_bin_ranges[0] = meta.table_sizes[0] / (meta.block_sizes[0] / NUM_PWARP_SIZE);
-    for (std::int32_t i = 1; i < meta.n_bins; i++)
-        meta.h_bin_ranges[i] = meta.table_sizes[i];
-    utils::memcpy_async(meta.d_bin_ranges,
-                        meta.h_bin_ranges,
-                        meta.n_bins * sizeof(std::int32_t));
-
-    SPDLOG_DEBUG("Numeric bins");
-    SPDLOG_DEBUG("* Bins with MAX_THREADS_PER_BLOCK are combined into one");
-    SPDLOG_DEBUG("{:>12s} {:>12s} {:>12s} {:>12s}",
-                 "Bin",
-                 "Block size",
-                 "Table size",
-                 "Range");
-    for (std::int32_t i = 0; i < meta.n_bins; i++) {
-        SPDLOG_DEBUG("{:12d} {:12d} {:12d} {:12d}",
-                     i,
-                     meta.block_sizes[i],
-                     meta.table_sizes[i],
-                     meta.h_bin_ranges[i]);
-    }
-
     // Wait for all bins to finish
-    for (std::int32_t i = 0; i + 1 < meta.n_bins; i++)
+    for (std::int32_t i = 0; i < Params::SYM2_N_BINS; i++)
         utils::stream_sync(meta.streams[i]);
 
     utils::stream_sync();
