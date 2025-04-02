@@ -1,4 +1,4 @@
-add_library_wrapped(libproposal PUBLIC src/sym.cu src/sym2.cu)
-target_include_directories(libproposal PUBLIC include)
+add_library_wrapped(libproposal INTERFACE)
+target_include_directories(libproposal INTERFACE include)
 
-target_link_libraries(libproposal PUBLIC libutils)
+target_link_libraries(libproposal INTERFACE libutils)
