@@ -31,10 +31,11 @@ __forceinline__ __device__ auto find_bin(const std::int32_t x) -> std::int32_t {
     __builtin_unreachable();
 }
 
-template<BinningType BinType, typename GetValueF>
-__global__ void k_binning1(const __grid_constant__ std::int32_t m,
-                           __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
-                           GetValueF get_value) {
+template<std::int32_t BLOCK_SIZE, BinningType BinType, typename GetValueF>
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_binning1(const __grid_constant__ std::int32_t m,
+                    __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
+                    GetValueF get_value) {
     static constexpr auto RANGES = get_ranges<BinType>();
     static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
 
@@ -59,13 +60,13 @@ __global__ void k_binning1(const __grid_constant__ std::int32_t m,
         atomicAdd(bin_sizes + tib, s_bin_sizes[tib]);
 }
 
-template<BinningType BinType, typename GetValueF>
-__global__ void k_binning2(
-    const __grid_constant__ std::int32_t m,
-    const __grid_constant__ std::int32_t* const __restrict__ bin_offsets,
-    __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
-    __grid_constant__ std::int32_t* const __restrict__ bins,
-    GetValueF get_value) {
+template<std::int32_t BLOCK_SIZE, BinningType BinType, typename GetValueF>
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_binning2(const __grid_constant__ std::int32_t m,
+                    const __grid_constant__ std::int32_t* const __restrict__ bin_offsets,
+                    __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
+                    __grid_constant__ std::int32_t* const __restrict__ bins,
+                    GetValueF get_value) {
     static constexpr auto RANGES = get_ranges<BinType>();
     static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
 
@@ -141,7 +142,7 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
 
     // Perform full two-stage symbolic binning
     utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t));
-    utils::launch_kernel(k_binning1<BinType, GetValueF>,
+    utils::launch_kernel(k_binning1<Params::OPTIMAL_BLOCK_SIZE, BinType, GetValueF>,
                          cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
                          Params::OPTIMAL_BLOCK_SIZE,
                          0,
@@ -171,7 +172,7 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     utils::memcpy_async(meta.d_bin_offsets,
                         meta.h_bin_offsets,
                         N_BINS * sizeof(std::int32_t));
-    utils::launch_kernel(k_binning2<BinType, GetValueF>,
+    utils::launch_kernel(k_binning2<Params::OPTIMAL_BLOCK_SIZE, BinType, GetValueF>,
                          cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
                          Params::OPTIMAL_BLOCK_SIZE,
                          0,

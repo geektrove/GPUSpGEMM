@@ -21,13 +21,13 @@
 namespace cg = cooperative_groups;
 
 template<std::int32_t BLOCK_SIZE>
-__global__ void k_compute_nip(
-    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ a_col,
-    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-    const __grid_constant__ std::int32_t m,
-    __grid_constant__ std::int32_t* const __restrict__ nips,
-    __grid_constant__ std::int32_t* const __restrict__ max_nip) {
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_compute_nip(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                       const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                       const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                       const __grid_constant__ std::int32_t m,
+                       __grid_constant__ std::int32_t* const __restrict__ nips,
+                       __grid_constant__ std::int32_t* const __restrict__ max_nip) {
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto warp = cg::tiled_partition<WARP_SIZE>(block);

@@ -23,14 +23,14 @@
 namespace cg = cooperative_groups;
 
 template<std::int32_t BLOCK_SIZE, std::int32_t PWARP_SIZE, std::int32_t TOTAL_TABLE_SIZE>
-__global__ void k_sym1_smem_pwarp(
-    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ a_col,
-    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ b_col,
-    const __grid_constant__ std::int32_t* const __restrict__ bins,
-    const __grid_constant__ std::int32_t bin_size,
-    __grid_constant__ std::int32_t* const __restrict__ nnzs) {
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_sym1_smem_pwarp(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                           const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                           const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                           const __grid_constant__ std::int32_t* const __restrict__ b_col,
+                           const __grid_constant__ std::int32_t* const __restrict__ bins,
+                           const __grid_constant__ std::int32_t bin_size,
+                           __grid_constant__ std::int32_t* const __restrict__ nnzs) {
     static_assert(utils::ispow2(BLOCK_SIZE));
     static_assert(utils::ispow2(TOTAL_TABLE_SIZE));
     static_assert(utils::ispow2(PWARP_SIZE));
@@ -89,13 +89,13 @@ __global__ void k_sym1_smem_pwarp(
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
-__global__ void k_sym1_smem(
-    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ a_col,
-    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ b_col,
-    const __grid_constant__ std::int32_t* const __restrict__ bins,
-    __grid_constant__ std::int32_t* const __restrict__ nnzs) {
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_sym1_smem(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                     const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                     const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                     const __grid_constant__ std::int32_t* const __restrict__ b_col,
+                     const __grid_constant__ std::int32_t* const __restrict__ bins,
+                     __grid_constant__ std::int32_t* const __restrict__ nnzs) {
     static_assert(utils::ispow2(TABLE_SIZE));
 
     extern __shared__ cuda::std::byte smem[];
@@ -141,15 +141,16 @@ __global__ void k_sym1_smem(
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
-__global__ void k_sym1_smem_max(
-    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ a_col,
-    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ b_col,
-    const __grid_constant__ std::int32_t* const __restrict__ bins,
-    __grid_constant__ std::int32_t* const __restrict__ nnzs,
-    __grid_constant__ std::int32_t* const __restrict__ fail_bin,
-    __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_sym1_smem_max(
+        const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+        const __grid_constant__ std::int32_t* const __restrict__ a_col,
+        const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+        const __grid_constant__ std::int32_t* const __restrict__ b_col,
+        const __grid_constant__ std::int32_t* const __restrict__ bins,
+        __grid_constant__ std::int32_t* const __restrict__ nnzs,
+        __grid_constant__ std::int32_t* const __restrict__ fail_bin,
+        __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
     extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
@@ -205,15 +206,15 @@ __global__ void k_sym1_smem_max(
 }
 
 template<std::int32_t BLOCK_SIZE>
-__global__ void k_sym1_global(
-    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ a_col,
-    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ b_col,
-    const __grid_constant__ std::int32_t* const __restrict__ bins,
-    const __grid_constant__ std::int32_t table_size,
-    __grid_constant__ std::int32_t* const __restrict__ tables,
-    __grid_constant__ std::int32_t* const __restrict__ nnzs) {
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_sym1_global(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                       const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                       const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                       const __grid_constant__ std::int32_t* const __restrict__ b_col,
+                       const __grid_constant__ std::int32_t* const __restrict__ bins,
+                       const __grid_constant__ std::int32_t table_size,
+                       __grid_constant__ std::int32_t* const __restrict__ tables,
+                       __grid_constant__ std::int32_t* const __restrict__ nnzs) {
     __shared__ std::int32_t s_nnz;
 
     const auto grid = cg::this_grid();

@@ -39,18 +39,18 @@ template<std::floating_point T,
          std::int32_t BLOCK_SIZE,
          std::int32_t PWARP_SIZE,
          std::int32_t TOTAL_ARRAY_SIZE>
-__global__ void k_num_smem_pwarp(
-    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ a_col,
-    const __grid_constant__ T* const __restrict__ a_val,
-    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ b_col,
-    const __grid_constant__ T* const __restrict__ b_val,
-    const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ c_col,
-    const __grid_constant__ std::int32_t* const __restrict__ bins,
-    const __grid_constant__ std::int32_t bin_size,
-    __grid_constant__ T* const __restrict__ c_val) {
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_num_smem_pwarp(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                          const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                          const __grid_constant__ T* const __restrict__ a_val,
+                          const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                          const __grid_constant__ std::int32_t* const __restrict__ b_col,
+                          const __grid_constant__ T* const __restrict__ b_val,
+                          const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
+                          const __grid_constant__ std::int32_t* const __restrict__ c_col,
+                          const __grid_constant__ std::int32_t* const __restrict__ bins,
+                          const __grid_constant__ std::int32_t bin_size,
+                          __grid_constant__ T* const __restrict__ c_val) {
     static_assert(utils::ispow2(BLOCK_SIZE));
     static_assert(utils::ispow2(PWARP_SIZE));
     static_assert(PWARP_SIZE <= WARP_SIZE);
@@ -103,16 +103,17 @@ __global__ void k_num_smem_pwarp(
 }
 
 template<std::floating_point T, std::int32_t BLOCK_SIZE, std::int32_t ARRAY_SIZE>
-__global__ void k_num_smem(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-                           const __grid_constant__ std::int32_t* const __restrict__ a_col,
-                           const __grid_constant__ T* const __restrict__ a_val,
-                           const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-                           const __grid_constant__ std::int32_t* const __restrict__ b_col,
-                           const __grid_constant__ T* const __restrict__ b_val,
-                           const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
-                           const __grid_constant__ std::int32_t* const __restrict__ c_col,
-                           const __grid_constant__ std::int32_t* const __restrict__ bins,
-                           __grid_constant__ T* const __restrict__ c_val) {
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_num_smem(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                    const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                    const __grid_constant__ T* const __restrict__ a_val,
+                    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                    const __grid_constant__ std::int32_t* const __restrict__ b_col,
+                    const __grid_constant__ T* const __restrict__ b_val,
+                    const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
+                    const __grid_constant__ std::int32_t* const __restrict__ c_col,
+                    const __grid_constant__ std::int32_t* const __restrict__ bins,
+                    __grid_constant__ T* const __restrict__ c_val) {
     extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
@@ -151,17 +152,17 @@ __global__ void k_num_smem(const __grid_constant__ std::int32_t* const __restric
 }
 
 template<std::floating_point T, std::int32_t BLOCK_SIZE>
-__global__ void k_num_global(
-    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ a_col,
-    const __grid_constant__ T* const __restrict__ a_val,
-    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ b_col,
-    const __grid_constant__ T* const __restrict__ b_val,
-    const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
-    const __grid_constant__ std::int32_t* const __restrict__ c_col,
-    const __grid_constant__ std::int32_t* const __restrict__ bins,
-    __grid_constant__ T* const __restrict__ c_val) {
+__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+    void k_num_global(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                      const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                      const __grid_constant__ T* const __restrict__ a_val,
+                      const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                      const __grid_constant__ std::int32_t* const __restrict__ b_col,
+                      const __grid_constant__ T* const __restrict__ b_val,
+                      const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
+                      const __grid_constant__ std::int32_t* const __restrict__ c_col,
+                      const __grid_constant__ std::int32_t* const __restrict__ bins,
+                      __grid_constant__ T* const __restrict__ c_val) {
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());

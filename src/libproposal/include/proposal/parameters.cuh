@@ -17,6 +17,8 @@ struct Parameters;
 
 template<>
 struct Parameters<CC86> {
+    static constexpr std::int32_t MAX_THREADS_PER_SM = 1536;
+
     // Optimal block size for 100% occupancy
     static constexpr std::int32_t OPTIMAL_BLOCK_SIZE = 512;
 
@@ -112,5 +114,13 @@ __device__ consteval auto get_ranges() {
     } else if constexpr (BinType == BinningType::NUM) {
         return Parameters<__CUDA_ARCH__>::NUM_RANGES;
     }
+#endif
+}
+
+__device__ consteval auto get_minctapersm(const std::int32_t block_size) -> std::int32_t {
+#ifdef __CUDA_ARCH__
+    return Parameters<__CUDA_ARCH__>::MAX_THREADS_PER_SM / block_size;
+#else
+    return 1;
 #endif
 }
