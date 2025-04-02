@@ -6,23 +6,25 @@
 #include <utils/utils.cuh>
 
 #include <proposal/meta.cuh>
+#include <proposal/parameters.cuh>
 
-inline auto cleanup(Meta& meta) -> void {
+template<typename Params>
+auto cleanup(Meta<Params>& meta) -> void {
     NVTX3_FUNC_RANGE();
+
     SPDLOG_DEBUG("Free device memory asynchronously");
     utils::free_async(meta.d_ptr);
     if (meta.d_mem_pool != nullptr) {
         SPDLOG_DEBUG("Free device memory pool asynchronously");
-        utils::free_async<utils::Location::Device>(meta.d_mem_pool);
+        utils::free_async(meta.d_mem_pool);
     }
-    SPDLOG_DEBUG("Free host memory");
-    utils::free<utils::Location::Host>(meta.h_ptr);
+
     SPDLOG_DEBUG("Destroy streams");
-    for (std::int32_t i = 0; i < meta.n_bins; i++)
-        utils::handle_cuda_error(cudaStreamDestroy(meta.streams[i]));
-    utils::free<utils::Location::Host>(static_cast<void*>(meta.streams));
+    for (auto& stream : meta.streams)
+        utils::handle_cuda_error(cudaStreamDestroy(stream));
     SPDLOG_DEBUG("Destroy events");
     for (auto& event : meta.events)
         utils::handle_cuda_error(cudaEventDestroy(event));
+
     utils::stream_sync();
 }
