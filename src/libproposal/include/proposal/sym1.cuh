@@ -219,7 +219,7 @@ __global__ void k_sym1_global(
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto& tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     auto* table = tables + (static_cast<ptrdiff_t>(grid.block_rank()) * table_size);
     for (auto i = tib; i < table_size; i += BLOCK_SIZE)
