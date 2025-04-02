@@ -25,6 +25,7 @@ Checks: >
   -readability-identifier-length,
   -readability-static-accessed-through-instance,
   -readability-redundant-declaration,
+  -readability-function-cognitive-complexity,
 WarningsAsErrors: ""
 HeaderFileExtensions:
   - ""
