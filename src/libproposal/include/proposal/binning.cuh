@@ -161,10 +161,11 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     for (int i = 0; i + 1 < N_BINS; i++)
         meta.h_bin_offsets[i + 1] = meta.h_bin_offsets[i] + meta.h_bin_sizes[i];
 
-    SPDLOG_DEBUG("{:>12s} {:>12s} {:>12s}", "Bin", "Size", "Offset");
+    SPDLOG_DEBUG("{:>6s} {:>10s} {:>10s} {:>10s}", "Bin", "Range", "Size", "Offset");
     for (std::int32_t i = 0; i < N_BINS; i++)
-        SPDLOG_DEBUG("{:12d} {:12d} {:>12d}",
+        SPDLOG_DEBUG("{:>6d} {:10d} {:>10d} {:>10d}",
                      i,
+                     RANGES[i],
                      meta.h_bin_sizes[i],
                      meta.h_bin_offsets[i]);
 
