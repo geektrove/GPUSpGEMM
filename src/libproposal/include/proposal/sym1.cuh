@@ -84,8 +84,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     }
     tile.sync();
 
-    const auto sum_nnz = cg::reduce(tile, l_nnz, cg::plus<std::int32_t>{});
-    cg::invoke_one(tile, [&] { nnzs[row] = sum_nnz; });
+    cg::reduce_store_async(tile, &nnzs[row], l_nnz, cg::plus<std::int32_t>{});
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
