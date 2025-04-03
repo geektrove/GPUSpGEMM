@@ -327,7 +327,14 @@ void sym2(const utils::DeviceCSR<T>& A,
         static constexpr auto BLOCK_SIZE =
             Params::SYM2_BLOCK_SIZES[Params::SYM2_GLOBAL_MEM_BIN];
 
-        const auto table_size = meta.h_max_row_nnz;
+        // Because mem pool is allocated for fail bin during SYM1 phase based on NIP,
+        // there is always enough space for SYM2 global memory bin.
+        const auto available_table_size = gsl::narrow_cast<std::int32_t>(
+            meta.mem_pool_size / (sizeof(std::int32_t) * global_mem_bin_size));
+        const auto desirable_table_size = gsl::narrow_cast<std::int32_t>(
+            meta.h_max_row_nnz / SYM2_RANGE_RATIO);
+        const auto table_size = std::min(desirable_table_size, available_table_size);
+
         utils::launch_kernel(k_sym2_global<BLOCK_SIZE>,
                              global_mem_bin_size,
                              BLOCK_SIZE,
