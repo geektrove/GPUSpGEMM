@@ -64,7 +64,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     //Aggregate column indices in the hash table
     const auto row = bins[row_id];
     assert(nnzs[row] <= TABLE_SIZE);
-    auto l_nnz = 0;
+    std::int32_t l_nnz = 0;
     for (auto i = a_rpt[row] + tip; i < a_rpt[row + 1]; i += PWARP_SIZE) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
