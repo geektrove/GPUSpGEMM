@@ -123,11 +123,9 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
-    auto* s_offset = s_table + TABLE_SIZE;
 
     for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
         s_table[i] = HASH_EMPTY;
-    cg::invoke_one(block, [&] { *s_offset = 0; });
     block.sync();
 
     // Aggregate the column indices in the hash table
