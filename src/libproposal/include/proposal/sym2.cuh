@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cuda/std/cstddef>
@@ -51,24 +52,19 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto pib = utils::divpow2(tib, PWARP_SIZE);
 
     auto* s_tables = reinterpret_cast<std::int32_t*>(smem);
-    auto* s_offsets = s_tables + TOTAL_TABLE_SIZE;
 
     for (auto i = tib; i < TOTAL_TABLE_SIZE; i += BLOCK_SIZE)
         s_tables[i] = HASH_EMPTY;
-    if (tib < ROWS_PER_BLOCK)
-        s_offsets[tib] = 0;
     block.sync();
 
     const auto row_id = utils::divpow2(tig, PWARP_SIZE);
     if (row_id >= bin_size)
         return;
-
     auto* s_table = s_tables + static_cast<ptrdiff_t>(pib * TABLE_SIZE);
-    auto* s_offset = s_offsets + pib;
+
+    // Aggregate column indices in the hash table
     const auto row = bins[row_id];
     assert(c_rpt[row + 1] - c_rpt[row] <= TABLE_SIZE);
-
-    // Aggregate the column indices in the hash table
     for (auto i = a_rpt[row] + tip; i < a_rpt[row + 1]; i += PWARP_SIZE) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
@@ -84,28 +80,27 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     }
     tile.sync();
 
-    // Condense the column indices
-    for (auto offset = 0; offset < TABLE_SIZE; offset += PWARP_SIZE) {
-        const auto i = offset + tip;
-        const auto col = i < TABLE_SIZE ? s_table[i] : HASH_EMPTY;
-        tile.sync();
-        if (col != HASH_EMPTY)
-            s_table[atomicAdd_block(s_offset, 1)] = col;
+    // Sort using bitonic sort
+    auto* s_table_unsigned = reinterpret_cast<std::uint32_t*>(s_table);
+    for (std::int32_t width = 2; width <= TABLE_SIZE; width *= 2) {
+        for (auto stride = width / 2; stride > 0; stride /= 2) {
+            for (auto i = tip; i < TABLE_SIZE; i += PWARP_SIZE) {
+                if ((i & stride) != 0)
+                    continue;
+                const auto j = i | stride;
+                const auto down = (i & width) != 0;
+                if (down == (s_table_unsigned[i] < s_table_unsigned[j]))
+                    cuda::std::swap(s_table_unsigned[i], s_table_unsigned[j]);
+            }
+            tile.sync();
+        }
     }
-    tile.sync();
 
-    // Write the column indices to the output
+    // Write sorted column indices to C.col
     const auto c_offset = c_rpt[row];
     const auto nnz = c_rpt[row + 1] - c_offset;
-    for (auto i = tip; i < nnz; i += PWARP_SIZE) {
-        const auto col = s_table[i];
-        std::int32_t n_less = 0;
-        for (std::int32_t j = 0; j < nnz; j++) {
-            if (s_table[j] < col)
-                n_less++;
-        }
-        c_col[c_offset + n_less] = col;
-    }
+    for (auto i = tip; i < nnz; i += PWARP_SIZE)
+        c_col[c_offset + i] = s_table[i];
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
