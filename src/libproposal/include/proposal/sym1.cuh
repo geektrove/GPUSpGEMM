@@ -154,6 +154,9 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
         __grid_constant__ std::int32_t* const __restrict__ nnzs,
         __grid_constant__ std::int32_t* const __restrict__ fail_bin,
         __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
+    static constexpr auto THRESHOLD = gsl::narrow_cast<std::int32_t>(TABLE_SIZE
+                                                                     * SYM1_RANGE_RATIO);
+
     extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
@@ -173,7 +176,6 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
-    const auto threshold = TABLE_SIZE * SYM1_RANGE_RATIO;
     cuda::std::invoke([&] {
         for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
             const auto colrow = a_col[i];
@@ -183,7 +185,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
                 while (true) {
                     const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
                     if (old == HASH_EMPTY) {
-                        if (atomicAdd_block(s_nnz, 1) >= threshold)
+                        if (atomicAdd_block(s_nnz, 1) >= THRESHOLD)
                             return;
                         break;
                     }
@@ -198,7 +200,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
 
     cg::invoke_one(block, [&] {
         const auto nnz = *s_nnz;
-        if (nnz <= threshold) {
+        if (nnz <= THRESHOLD) {
             nnzs[row] = nnz;
         } else {
             const auto idx = atomicAdd(fail_bin_size, 1);
