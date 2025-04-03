@@ -208,13 +208,12 @@ void sym_binning2(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_valu
     utils::memcpy_async(&meta.h_max_row_nnz,
                         meta.d_max_row_nnz,
                         sizeof(meta.h_max_row_nnz));
-    utils::memcpy_async(&meta.h_total_nnz, C.rpt + C.m, sizeof(meta.h_total_nnz));
+    utils::memcpy_async(&C.nnz, C.rpt + C.m, sizeof(C.nnz));
     utils::stream_sync();
     SPDLOG_DEBUG("Max NNZ per row is {}", meta.h_max_row_nnz);
-    SPDLOG_DEBUG("Total NNZ in C is {}", meta.h_total_nnz);
+    SPDLOG_DEBUG("Total NNZ in C is {}", C.nnz);
 
     // Allocate C.col
-    C.nnz = meta.h_total_nnz;
     auto* col_ptr = utils::malloc_async(C.nnz * sizeof(*C.col), meta.streams[0]);
     C.col = static_cast<std::int32_t*>(col_ptr);
 

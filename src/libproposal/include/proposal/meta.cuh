@@ -17,7 +17,6 @@ struct Meta {
     std::int32_t h_bin_sizes[Params::MAX_N_BINS]{};
     std::int32_t h_bin_offsets[Params::MAX_N_BINS]{};
     std::int32_t h_max_row_nnz{};
-    std::int32_t h_total_nnz{};
 
     // Device memory (combined)
     void* d_ptr{};
@@ -25,7 +24,6 @@ struct Meta {
     std::int32_t* d_bin_sizes{};   // size n_bins
     std::int32_t* d_bin_offsets{}; // size n_bins
     std::int32_t* d_max_row_nnz{}; // size 1
-    std::int32_t* d_total_nnz{};   // size 1
     void* d_cub_storage{};         // size cub_storage_size
 
     // Device memory (separate)
