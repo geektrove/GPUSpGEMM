@@ -10,7 +10,7 @@ inline constexpr std::int32_t N_CUDA_EVENTS = 1;
 inline constexpr std::int32_t WARP_SIZE = 32;
 inline constexpr std::int32_t HASH_EMPTY = -1;
 inline constexpr std::int32_t HASH_SCALE = 107;
-inline constexpr double SYM_RANGE_RATIO = 1 / 1.2;
+inline constexpr double SYM1_RANGE_RATIO = 1 / 1.2;
 
 inline constexpr std::int32_t CC86 = 860;
 
@@ -28,21 +28,25 @@ struct Parameters<CC86> {
     // Symbolic 1
     //
 
-    static constexpr std::int32_t SYM1_N_BINS = 7;
-
-    static constexpr std::int32_t SYM1_PWARP_BIN = 0;
-    static constexpr std::int32_t SYM1_PWARP_SIZE = 4;
-    static constexpr std::int32_t SYM1_SMEM_BIN_BEGIN = 4;
-    static constexpr std::int32_t SYM1_MAX_SMEM_BIN = 5;
-    static constexpr std::int32_t SYM1_GLOBAL_MEM_BIN = 6;
-
-    using SYM1_CUDA_ARRAY = cuda::std::array<std::int32_t, SYM1_N_BINS>;
-    static constexpr SYM1_CUDA_ARRAY SYM1_BLOCK_SIZES =
+    static constexpr cuda::std::array SYM1_BLOCK_SIZES =
         {512, 128, 256, 512, 1024, 1024, 1024};
-    static constexpr SYM1_CUDA_ARRAY SYM1_TABLE_SIZES =
+    static constexpr cuda::std::array SYM1_PWARP_SIZES = {4, 0, 0, 0, 0, 0, 0};
+    static constexpr cuda::std::array SYM1_TABLE_SIZES =
         {8192, 1024, 2048, 8192, 16384, 25343, INT32_MAX};
-    static constexpr SYM1_CUDA_ARRAY SYM1_RANGES =
+    static constexpr cuda::std::array SYM1_SMEM_SIZES =
+        {32768, 4096, 8192, 32768, 65536, 101'376, INT32_MAX};
+    static constexpr cuda::std::array SYM1_RANGES =
         {53, 853, 1706, 6826, 13653, INT32_MAX, INT32_MAX};
+
+    static_assert(SYM1_BLOCK_SIZES.size() == SYM1_PWARP_SIZES.size());
+    static_assert(SYM1_BLOCK_SIZES.size() == SYM1_TABLE_SIZES.size());
+    static_assert(SYM1_BLOCK_SIZES.size() == SYM1_SMEM_SIZES.size());
+    static_assert(SYM1_BLOCK_SIZES.size() == SYM1_RANGES.size());
+
+    static constexpr auto SYM1_N_BINS = gsl::narrow_cast<std::int32_t>(
+        SYM1_BLOCK_SIZES.size());
+    static constexpr auto SYM1_GLOBAL_MEM_BIN = SYM1_N_BINS - 1;
+    static constexpr auto SYM1_MAX_SMEM_BIN = SYM1_N_BINS - 2;
 
     //
     // Symbolic 2
