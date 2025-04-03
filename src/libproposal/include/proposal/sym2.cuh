@@ -324,9 +324,6 @@ void sym2(const utils::DeviceCSR<T>& A,
           Meta<Params>& meta) {
     NVTX3_FUNC_RANGE();
 
-    static constexpr auto IdxByteSize = gsl::narrow_cast<std::int32_t>(
-        sizeof(std::int32_t));
-
     // Handle global memory bin
     const auto global_mem_bin_size = meta.h_bin_sizes[Params::SYM2_GLOBAL_MEM_BIN];
     SPDLOG_DEBUG("SYM2 bin {} size is {}",
@@ -362,7 +359,7 @@ void sym2(const utils::DeviceCSR<T>& A,
             Params::SYM2_BLOCK_SIZES[Params::SYM2_MAX_SMEM_BIN];
         static constexpr auto TABLE_SIZE =
             Params::SYM2_TABLE_SIZES[Params::SYM2_MAX_SMEM_BIN];
-        static constexpr auto SMEM = (TABLE_SIZE + 1) * IdxByteSize;
+        static constexpr auto SMEM = Params::SYM2_SMEM_SIZES[Params::SYM2_MAX_SMEM_BIN];
 
         utils::handle_cuda_error(
             cudaFuncSetAttribute(k_sym2_smem_max<BLOCK_SIZE, TABLE_SIZE>,
@@ -392,8 +389,7 @@ void sym2(const utils::DeviceCSR<T>& A,
 
             static constexpr auto BLOCK_SIZE = Params::SYM2_BLOCK_SIZES[BIN];
             static constexpr auto TABLE_SIZE = Params::SYM2_TABLE_SIZES[BIN];
-            static constexpr auto SMEM = (Params::SYM2_TABLE_SIZES[BIN] + 1)
-                                         * IdxByteSize;
+            static constexpr auto SMEM = Params::SYM2_SMEM_SIZES[BIN];
 
             utils::handle_cuda_error(
                 cudaFuncSetAttribute(k_sym2_smem<BLOCK_SIZE, TABLE_SIZE>,
@@ -424,7 +420,7 @@ void sym2(const utils::DeviceCSR<T>& A,
             Params::SYM2_TABLE_SIZES[Params::SYM2_PWARP_BIN];
         static constexpr auto PWARP_SIZE = Params::SYM2_PWARP_SIZE;
         static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE, PWARP_SIZE);
-        static constexpr auto SMEM = TABLE_SIZE * IdxByteSize;
+        static constexpr auto SMEM = Params::SYM2_SMEM_SIZES[Params::SYM2_PWARP_BIN];
 
         utils::handle_cuda_error(
             cudaFuncSetAttribute(k_sym2_smem_pwarp<BLOCK_SIZE, PWARP_SIZE, TABLE_SIZE>,

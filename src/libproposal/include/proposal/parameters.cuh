@@ -59,6 +59,8 @@ struct Parameters<CC86> {
         {512, 128, 256, 512, 1024, 1024, 1024};
     static constexpr SYM2_CUDA_ARRAY SYM2_TABLE_SIZES =
         {4096, 1024, 2048, 8192, 16384, 25343, INT32_MAX};
+    static constexpr SYM2_CUDA_ARRAY SYM2_SMEM_SIZES =
+        {16896, 4224, 8448, 33792, 67584, 101'376, INT32_MAX};
     static constexpr SYM2_CUDA_ARRAY SYM2_RANGES =
         {26, 853, 1706, 6826, 13653, 21119, INT32_MAX};
 
