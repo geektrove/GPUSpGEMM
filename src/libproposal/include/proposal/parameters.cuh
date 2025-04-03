@@ -6,6 +6,8 @@
 
 #include <gsl/gsl-lite.hpp>
 
+namespace proposal {
+
 inline constexpr std::int32_t N_CUDA_EVENTS = 1;
 inline constexpr std::int32_t WARP_SIZE = 32;
 inline constexpr std::int32_t HASH_EMPTY = -1;
@@ -134,3 +136,5 @@ __device__ consteval auto get_minctapersm(const std::int32_t block_size) -> std:
     return 1;
 #endif
 }
+
+} // namespace proposal

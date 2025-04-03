@@ -21,6 +21,8 @@
 #include <proposal/parameters.cuh>
 #include <proposal/utils.cuh>
 
+namespace proposal {
+
 namespace cg = cooperative_groups;
 
 template<std::int32_t BLOCK_SIZE, std::int32_t PWARP_SIZE, std::int32_t TOTAL_TABLE_SIZE>
@@ -418,3 +420,5 @@ void sym1(const utils::DeviceCSR<T>& A,
     if (d_fail_bin != nullptr && d_fail_bin != meta.d_cub_storage)
         utils::free_async(d_fail_bin, meta.streams[Params::SYM1_GLOBAL_MEM_BIN]);
 }
+
+} // namespace proposal

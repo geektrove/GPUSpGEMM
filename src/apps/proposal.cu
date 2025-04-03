@@ -36,13 +36,13 @@ auto main(int argc, char** argv) -> int {
 
     // Warmup
     for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-        auto c = proposal(d_a, d_b);
+        auto c = proposal::proposal(d_a, d_b);
         utils::device_sync();
         std::this_thread::sleep_for(SLEEP_TIME);
     }
 
     // Execute
-    const auto d_c = proposal(d_a, d_b);
+    const auto d_c = proposal::proposal(d_a, d_b);
 
     // Save the result
     auto h_c = d_c.to<utils::Location::Host>();

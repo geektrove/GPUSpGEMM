@@ -20,6 +20,8 @@
 
 namespace cg = cooperative_groups;
 
+namespace proposal {
+
 template<auto RANGES>
 __forceinline__ __device__ auto find_bin(const std::int32_t x) -> std::int32_t {
     static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
@@ -222,3 +224,5 @@ void sym_binning2(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_valu
 
     utils::stream_sync(meta.streams[0]);
 }
+
+} // namespace proposal

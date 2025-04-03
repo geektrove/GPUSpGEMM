@@ -22,7 +22,7 @@ void benchmark_proposal(benchmark::State& state,
     // Warmup
     for (int i = 0; i < WARMUP_ITERATIONS; i++) {
         std::this_thread::sleep_for(SLEEP_TIME);
-        auto c = proposal(a, b);
+        auto c = proposal::proposal(a, b);
         utils::device_sync();
     }
 
@@ -37,7 +37,7 @@ void benchmark_proposal(benchmark::State& state,
         std::this_thread::sleep_for(SLEEP_TIME);
 
         const auto start = std::chrono::high_resolution_clock::now();
-        auto c = proposal(a, b);
+        auto c = proposal::proposal(a, b);
         utils::device_sync();
         const auto end = std::chrono::high_resolution_clock::now();
         const auto seconds = std::chrono::duration<double>(end - start).count();

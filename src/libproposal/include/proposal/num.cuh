@@ -18,6 +18,8 @@
 #include <proposal/parameters.cuh>
 #include <proposal/utils.cuh>
 
+namespace proposal {
+
 namespace cg = cooperative_groups;
 
 __forceinline__ __device__ auto find_key(const std::int32_t* const __restrict__ cols,
@@ -293,3 +295,5 @@ void num(const utils::DeviceCSR<T>& A,
     for (std::int32_t i = 0; i < Params::NUM_N_BINS; i++)
         utils::stream_sync(meta.streams[i]);
 }
+
+} // namespace proposal

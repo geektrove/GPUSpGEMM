@@ -8,6 +8,8 @@
 #include <proposal/meta.cuh>
 #include <proposal/parameters.cuh>
 
+namespace proposal {
+
 template<typename Params>
 auto cleanup(Meta<Params>& meta) -> void {
     NVTX3_FUNC_RANGE();
@@ -28,3 +30,5 @@ auto cleanup(Meta<Params>& meta) -> void {
 
     utils::stream_sync();
 }
+
+} // namespace proposal

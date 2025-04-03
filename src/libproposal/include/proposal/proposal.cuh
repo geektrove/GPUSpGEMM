@@ -16,6 +16,8 @@
 #include <proposal/sym1.cuh>
 #include <proposal/sym2.cuh>
 
+namespace proposal {
+
 template<std::floating_point T, typename Params>
 auto proposal_inner(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     -> utils::DeviceCSR<T> {
@@ -98,3 +100,5 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     }
     throw std::runtime_error("Unsupported compute capability");
 }
+
+} // namespace proposal

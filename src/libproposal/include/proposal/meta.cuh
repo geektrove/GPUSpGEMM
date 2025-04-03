@@ -5,6 +5,8 @@
 
 #include <proposal/parameters.cuh>
 
+namespace proposal {
+
 template<typename Params>
 struct Meta {
     std::array<cudaEvent_t, N_CUDA_EVENTS> events{};        // size 1
@@ -29,3 +31,5 @@ struct Meta {
     // Device memory (separate)
     void* d_mem_pool{};
 };
+
+} // namespace proposal

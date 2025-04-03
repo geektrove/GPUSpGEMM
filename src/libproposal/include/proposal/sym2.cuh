@@ -21,6 +21,8 @@
 #include <proposal/parameters.cuh>
 #include <proposal/utils.cuh>
 
+namespace proposal {
+
 namespace cg = cooperative_groups;
 
 template<std::int32_t BLOCK_SIZE, std::int32_t PWARP_SIZE, std::int32_t TOTAL_TABLE_SIZE>
@@ -441,3 +443,5 @@ void sym2(const utils::DeviceCSR<T>& A,
 
     utils::stream_sync();
 }
+
+} // namespace proposal

@@ -18,6 +18,8 @@
 #include <proposal/parameters.cuh>
 #include <proposal/utils.cuh>
 
+namespace proposal {
+
 namespace cg = cooperative_groups;
 
 template<std::int32_t BLOCK_SIZE>
@@ -167,3 +169,5 @@ void setup(const utils::DeviceCSR<T>& A,
 
     SPDLOG_DEBUG("Max NIP per row is {}", meta.h_max_row_nnz);
 }
+
+} // namespace proposal
