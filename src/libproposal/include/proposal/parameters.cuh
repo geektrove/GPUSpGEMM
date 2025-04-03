@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cuda/std/array>
 
+#include <gsl/gsl-lite.hpp>
+
 inline constexpr std::int32_t N_CUDA_EVENTS = 1;
 inline constexpr std::int32_t WARP_SIZE = 32;
 inline constexpr std::int32_t HASH_EMPTY = -1;
@@ -46,23 +48,25 @@ struct Parameters<CC86> {
     // Symbolic 2
     //
 
-    static constexpr std::int32_t SYM2_N_BINS = 7;
+    static constexpr cuda::std::array SYM2_BLOCK_SIZES =
+        {512, 512, 128, 256, 512, 1024, 1024, 1024};
+    static constexpr cuda::std::array SYM2_PWARP_SIZES = {4, 4, 0, 0, 0, 0, 0, 0};
+    static constexpr cuda::std::array SYM2_TABLE_SIZES =
+        {4096, 8192, 1024, 2048, 8192, 16384, 25343, INT32_MAX};
+    static constexpr cuda::std::array SYM2_SMEM_SIZES =
+        {16384, 32768, 4224, 8448, 33792, 67584, 101'376, INT32_MAX};
+    static constexpr cuda::std::array SYM2_RANGES =
+        {26, 53, 853, 1706, 6826, 13653, 21119, INT32_MAX};
 
-    static constexpr std::int32_t SYM2_PWARP_BIN = 0;
-    static constexpr std::int32_t SYM2_PWARP_SIZE = 4;
-    static constexpr std::int32_t SYM2_SMEM_BIN_BEGIN = 4;
-    static constexpr std::int32_t SYM2_MAX_SMEM_BIN = 5;
-    static constexpr std::int32_t SYM2_GLOBAL_MEM_BIN = 6;
+    static_assert(SYM2_BLOCK_SIZES.size() == SYM2_PWARP_SIZES.size());
+    static_assert(SYM2_BLOCK_SIZES.size() == SYM2_TABLE_SIZES.size());
+    static_assert(SYM2_BLOCK_SIZES.size() == SYM2_SMEM_SIZES.size());
+    static_assert(SYM2_BLOCK_SIZES.size() == SYM2_RANGES.size());
 
-    using SYM2_CUDA_ARRAY = cuda::std::array<std::int32_t, SYM2_N_BINS>;
-    static constexpr SYM2_CUDA_ARRAY SYM2_BLOCK_SIZES =
-        {512, 128, 256, 512, 1024, 1024, 1024};
-    static constexpr SYM2_CUDA_ARRAY SYM2_TABLE_SIZES =
-        {4096, 1024, 2048, 8192, 16384, 25343, INT32_MAX};
-    static constexpr SYM2_CUDA_ARRAY SYM2_SMEM_SIZES =
-        {16896, 4224, 8448, 33792, 67584, 101'376, INT32_MAX};
-    static constexpr SYM2_CUDA_ARRAY SYM2_RANGES =
-        {26, 853, 1706, 6826, 13653, 21119, INT32_MAX};
+    static constexpr auto SYM2_N_BINS = gsl::narrow_cast<std::int32_t>(
+        SYM2_BLOCK_SIZES.size());
+    static constexpr auto SYM2_GLOBAL_MEM_BIN = SYM2_N_BINS - 1;
+    static constexpr auto SYM2_MAX_SMEM_BIN = SYM2_N_BINS - 2;
 
     //
     // Numeric
