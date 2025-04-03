@@ -10,6 +10,7 @@
 
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
+#include <cub/cub.cuh>
 #include <gsl/gsl-lite.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
@@ -113,6 +114,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
                      const __grid_constant__ std::int32_t* const __restrict__ bins,
                      __grid_constant__ std::int32_t* const __restrict__ c_col) {
     static_assert(utils::ispow2(TABLE_SIZE));
+    static_assert(TABLE_SIZE % BLOCK_SIZE == 0);
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -150,28 +152,27 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     }
     block.sync();
 
-    // Condense the column indices
-    for (auto offset = 0; offset < TABLE_SIZE; offset += BLOCK_SIZE) {
-        const auto i = offset + tib;
-        const auto col = i < TABLE_SIZE ? s_table[i] : HASH_EMPTY;
-        block.sync();
-        if (col != HASH_EMPTY)
-            s_table[atomicAdd_block(s_offset, 1)] = col;
-    }
+    // Sort using radix sort
+    static constexpr auto ITEMS_PER_THREAD = TABLE_SIZE / BLOCK_SIZE;
+    std::int32_t l_cols[ITEMS_PER_THREAD];
+    for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
+        l_cols[utils::divpow2(i, BLOCK_SIZE)] = s_table[i];
+
+    using SortT = cub::BlockRadixSort<std::uint32_t, BLOCK_SIZE, ITEMS_PER_THREAD>;
+    using SortTempStorageT = typename SortT::TempStorage;
+    auto* sort_storage = reinterpret_cast<SortTempStorageT*>(smem);
+    SortT(*sort_storage)
+        .Sort(*reinterpret_cast<std::uint32_t(*)[ITEMS_PER_THREAD]>(&l_cols));
     block.sync();
 
-    // Write the column indices to the output
+    // Write sorted column indices to C.col
     const auto c_offset = c_rpt[row];
     const auto nnz = c_rpt[row + 1] - c_offset;
-    for (auto i = tib; i < nnz; i += BLOCK_SIZE) {
-        const auto col = s_table[i];
-        std::int32_t n_less = 0;
-        for (std::int32_t j = 0; j < nnz; j++) {
-            if (s_table[j] < col)
-                n_less++;
-        }
-        c_col[c_offset + n_less] = col;
-    }
+
+    using StoreT = cub::BlockStore<std::int32_t, BLOCK_SIZE, ITEMS_PER_THREAD>;
+    using StoreTempStorageT = typename StoreT::TempStorage;
+    auto* store_storage = reinterpret_cast<StoreTempStorageT*>(smem);
+    StoreT(*store_storage).Store(&c_col[c_offset], l_cols, nnz);
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
