@@ -28,6 +28,10 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
                        const __grid_constant__ std::int32_t m,
                        __grid_constant__ std::int32_t* const __restrict__ nips,
                        __grid_constant__ std::int32_t* const __restrict__ max_nip) {
+    using ReduceT = cub::BlockReduce<std::int32_t, BLOCK_SIZE>;
+
+    __shared__ typename ReduceT::TempStorage s_storage;
+
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto warp = cg::tiled_partition<WARP_SIZE>(block);
@@ -37,8 +41,8 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
 
     const auto row_length = tig < m ? a_rpt[tig + 1] - a_rpt[tig] : 0;
     const auto row_length_max = cg::reduce(warp, row_length, cg::greater<std::int32_t>{});
-    const auto l_nip = cuda::std::invoke([&] {
-        // If the maximum row length across wap is greater than threshold,
+    auto l_nip = cuda::std::invoke([&] {
+        // If the maximum row length across warp is greater than threshold,
         // use a warp per row
         if (row_length_max >= WARP_SIZE) {
             std::int32_t thread_row_nip = 0;
@@ -76,8 +80,10 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
         return row_nip;
     });
 
-    cuda::atomic_ref<std::int32_t, cuda::thread_scope_device> max_nip_ref{*max_nip};
-    cg::reduce_update_async(tile, max_nip_ref, l_nip, cg::greater<std::int32_t>{});
+    auto l_max_nip = ReduceT(s_storage).Reduce(
+        *reinterpret_cast<std::int32_t(*)[1]>(&l_nip),
+        cg::greater<std::int32_t>{});
+    cg::invoke_one(block, [&] { atomicMax(max_nip, l_max_nip); });
 }
 
 template<typename Params>
