@@ -80,9 +80,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
         return row_nip;
     });
 
-    auto l_max_nip = ReduceT(s_storage).Reduce(
-        *reinterpret_cast<std::int32_t(*)[1]>(&l_nip),
-        cg::greater<std::int32_t>{});
+    auto l_max_nip = ReduceT(s_storage).Reduce(l_nip, cg::greater<std::int32_t>{});
     cg::invoke_one(block, [&] { atomicMax(max_nip, l_max_nip); });
 }
 
