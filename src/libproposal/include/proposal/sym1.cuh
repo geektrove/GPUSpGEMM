@@ -166,6 +166,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
         s_table[i] = HASH_EMPTY;
     cg::invoke_one(block, [&] { *s_nnz = 0; });
+    block.sync();
 
     const auto row = bins[grid.block_rank()];
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
@@ -173,8 +174,6 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
     const auto threshold = TABLE_SIZE * SYM1_RANGE_RATIO;
-    block.sync();
-
     cuda::std::invoke([&] {
         for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
             const auto colrow = a_col[i];
