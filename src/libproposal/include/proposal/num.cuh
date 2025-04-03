@@ -82,7 +82,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto c_offset = c_rpt[row];
     const auto size = c_rpt[row + 1] - c_offset;
 
-    cg::memcpy_async(tile, s_cols, c_col + c_offset, size * sizeof(std::int32_t));
+    cg::memcpy_async(tile, s_cols, c_col + c_offset, size * sizeof(*s_cols));
     for (auto i = tip; i < size; i += PWARP_SIZE)
         s_vals[i] = 0;
     cg::wait(tile);
@@ -127,7 +127,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto c_offset = c_rpt[row];
     const auto size = c_rpt[row + 1] - c_offset;
 
-    cg::memcpy_async(block, s_cols, c_col + c_offset, size * sizeof(std::int32_t));
+    cg::memcpy_async(block, s_cols, c_col + c_offset, size * sizeof(*s_cols));
     for (auto i = tib; i < size; i += BLOCK_SIZE)
         s_vals[i] = 0;
     cg::wait(block);

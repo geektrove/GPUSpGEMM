@@ -141,7 +141,7 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     }
 
     // Perform full two-stage symbolic binning
-    utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t));
+    utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(*meta.d_bin_sizes));
     utils::launch_kernel(k_binning1<Params::OPTIMAL_BLOCK_SIZE, BinType, GetValueF>,
                          cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
                          Params::OPTIMAL_BLOCK_SIZE,
@@ -152,9 +152,9 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
                          get_value);
     utils::memcpy_async(meta.h_bin_sizes,
                         meta.d_bin_sizes,
-                        N_BINS * sizeof(std::int32_t));
+                        N_BINS * sizeof(*meta.h_bin_sizes));
     utils::event_record(meta.events[0]);
-    utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(std::int32_t));
+    utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(*meta.d_bin_sizes));
     utils::event_sync(meta.events[0]);
 
     meta.h_bin_offsets[0] = 0;
@@ -171,7 +171,7 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
 
     utils::memcpy_async(meta.d_bin_offsets,
                         meta.h_bin_offsets,
-                        N_BINS * sizeof(std::int32_t));
+                        N_BINS * sizeof(*meta.d_bin_offsets));
     utils::launch_kernel(k_binning2<Params::OPTIMAL_BLOCK_SIZE, BinType, GetValueF>,
                          cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
                          Params::OPTIMAL_BLOCK_SIZE,

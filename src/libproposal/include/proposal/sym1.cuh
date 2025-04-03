@@ -297,7 +297,7 @@ void sym1(const utils::DeviceCSR<T>& A,
         d_fail_bin_size = d_fail_bin + max_smem_bin_size;
         utils::memset_async(d_fail_bin_size,
                             0,
-                            sizeof(std::int32_t),
+                            sizeof(*d_fail_bin_size),
                             meta.streams[Params::SYM1_MAX_SMEM_BIN]);
 
         static constexpr auto BLOCK_SIZE =
@@ -325,7 +325,7 @@ void sym1(const utils::DeviceCSR<T>& A,
                              d_fail_bin_size);
         utils::memcpy_async(&h_fail_bin_size,
                             d_fail_bin_size,
-                            sizeof(std::int32_t),
+                            sizeof(h_fail_bin_size),
                             meta.streams[Params::SYM1_MAX_SMEM_BIN]);
     }
 

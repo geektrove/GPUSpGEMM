@@ -135,7 +135,7 @@ void setup(const utils::DeviceCSR<T>& A,
     C.rpt = static_cast<std::int32_t*>(rpt);
 
     // Compute NIP per row in C and find the maximum
-    utils::memset_async(C.rpt + C.m, 0, sizeof(std::int32_t));
+    utils::memset_async(C.rpt + C.m, 0, sizeof(*C.rpt));
     utils::launch_kernel(k_compute_nip<Params::OPTIMAL_BLOCK_SIZE>,
                          cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
                          Params::OPTIMAL_BLOCK_SIZE,
