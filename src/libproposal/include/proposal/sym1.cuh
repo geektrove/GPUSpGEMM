@@ -10,6 +10,7 @@
 
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
+#include <cub/cub.cuh>
 #include <gsl/gsl-lite.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
@@ -104,11 +105,9 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
-    auto* s_nnz = s_table + TABLE_SIZE;
 
     for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
         s_table[i] = HASH_EMPTY;
-    cg::invoke_one(block, [&] { *s_nnz = 0; });
     block.sync();
 
     const auto row = bins[grid.block_rank()];
@@ -117,6 +116,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
+    std::int32_t l_nnz = 0;
     for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
@@ -125,7 +125,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
             while (true) {
                 const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
                 if (old == HASH_EMPTY) {
-                    atomicAdd_block(s_nnz, 1);
+                    l_nnz++;
                     break;
                 }
                 if (old == key)
@@ -136,7 +136,11 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     }
     block.sync();
 
-    cg::invoke_one(block, [&] { nnzs[row] = *s_nnz; });
+    using ReduceT = cub::BlockReduce<std::int32_t, BLOCK_SIZE>;
+    using ReduceTempStorageT = typename ReduceT::TempStorage;
+    auto* reduce_storage = reinterpret_cast<ReduceTempStorageT*>(smem);
+    const auto nnz = ReduceT(*reduce_storage).Sum(l_nnz);
+    cg::invoke_one(block, [&] { nnzs[row] = nnz; });
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
@@ -214,7 +218,9 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
                        const __grid_constant__ std::int32_t table_size,
                        __grid_constant__ std::int32_t* const __restrict__ tables,
                        __grid_constant__ std::int32_t* const __restrict__ nnzs) {
-    __shared__ std::int32_t s_nnz;
+    using ReduceT = cub::BlockReduce<std::int32_t, BLOCK_SIZE>;
+
+    __shared__ typename ReduceT::TempStorage s_storage;
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
@@ -223,7 +229,6 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     auto* table = tables + (static_cast<ptrdiff_t>(grid.block_rank()) * table_size);
     for (auto i = tib; i < table_size; i += BLOCK_SIZE)
         table[i] = HASH_EMPTY;
-    cg::invoke_one(block, [&] { s_nnz = 0; });
     block.sync();
 
     const auto row = bins[grid.block_rank()];
@@ -232,6 +237,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
+    std::int32_t l_nnz = 0;
     for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
@@ -240,7 +246,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
             while (true) {
                 const auto old = atomicCAS_block(table + hash, HASH_EMPTY, key);
                 if (old == HASH_EMPTY) {
-                    atomicAdd_block(&s_nnz, 1);
+                    l_nnz++;
                     break;
                 }
                 if (old == key)
@@ -251,7 +257,8 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     }
     block.sync();
 
-    cg::invoke_one(block, [&] { nnzs[row] = s_nnz; });
+    const auto nnz = ReduceT(s_storage).Sum(l_nnz);
+    cg::invoke_one(block, [&] { nnzs[row] = nnz; });
 }
 
 template<std::floating_point T, typename Params>
