@@ -80,6 +80,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto row = bins[row_id];
     const auto c_offset = c_rpt[row];
     const auto size = c_rpt[row + 1] - c_offset;
+    assert(size <= ARRAY_SIZE);
 
     cg::memcpy_async(tile, s_cols, c_col + c_offset, size * sizeof(*s_cols));
     for (auto i = tip; i < size; i += PWARP_SIZE)
