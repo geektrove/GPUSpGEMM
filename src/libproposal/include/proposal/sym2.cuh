@@ -435,7 +435,7 @@ void sym2(const utils::DeviceCSR<T>& A,
 
     // Allocate C.val
     auto* val_ptr = utils::malloc_async(C.nnz * sizeof(T));
-    C.val = reinterpret_cast<T*>(val_ptr);
+    C.val = static_cast<T*>(val_ptr);
 
     // Wait for all bins to finish
     for (std::int32_t i = 0; i < Params::SYM2_N_BINS; i++)
