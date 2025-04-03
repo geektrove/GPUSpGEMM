@@ -390,9 +390,8 @@ void sym1(const utils::DeviceCSR<T>& A,
                 Params::SYM1_BLOCK_SIZES[Params::SYM1_GLOBAL_MEM_BIN];
 
             const auto table_size = meta.h_max_row_nnz;
-            meta.mem_pool_size = gsl::narrow_cast<std::size_t>(h_fail_bin_size
-                                                               * table_size)
-                                 * IdxByteSize;
+            meta.mem_pool_size = gsl::narrow_cast<std::size_t>(
+                h_fail_bin_size * table_size * IdxByteSize);
             meta.d_mem_pool = utils::malloc_async(
                 meta.mem_pool_size,
                 meta.streams[Params::SYM1_GLOBAL_MEM_BIN]);
