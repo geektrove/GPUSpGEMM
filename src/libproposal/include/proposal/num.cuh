@@ -51,12 +51,11 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
                           const __grid_constant__ std::int32_t* const __restrict__ bins,
                           const __grid_constant__ std::int32_t bin_size,
                           __grid_constant__ T* const __restrict__ c_val) {
-    static_assert(utils::ispow2(BLOCK_SIZE));
-    static_assert(utils::ispow2(PWARP_SIZE));
-    static_assert(PWARP_SIZE <= WARP_SIZE);
-
     static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE, PWARP_SIZE);
     static constexpr auto ARRAY_SIZE = utils::divpow2(TOTAL_ARRAY_SIZE, ROWS_PER_BLOCK);
+
+    static_assert(utils::ispow2(BLOCK_SIZE));
+    static_assert(PWARP_SIZE <= WARP_SIZE);
     static_assert(TOTAL_ARRAY_SIZE % ROWS_PER_BLOCK == 0);
 
     extern __shared__ cuda::std::byte smem[];
@@ -69,14 +68,14 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto tip = utils::modpow2(tib, PWARP_SIZE);
     const auto pib = utils::divpow2(tib, PWARP_SIZE);
 
+    const auto row_id = utils::divpow2(tig, PWARP_SIZE);
+    if (row_id >= bin_size)
+        return;
+
     auto* s_vals_all = reinterpret_cast<T*>(smem);
     auto* s_cols_all = reinterpret_cast<std::int32_t*>(s_vals_all + TOTAL_ARRAY_SIZE);
     auto* s_vals = s_vals_all + (pib * ARRAY_SIZE);
     auto* s_cols = s_cols_all + static_cast<ptrdiff_t>(pib * ARRAY_SIZE);
-
-    const auto row_id = utils::divpow2(tig, PWARP_SIZE);
-    if (row_id >= bin_size)
-        return;
 
     const auto row = bins[row_id];
     const auto c_offset = c_rpt[row];
@@ -171,8 +170,8 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto c_offset = c_rpt[row];
     const auto size = c_rpt[row + 1] - c_offset;
 
-    const auto* cols = c_col + c_offset;
     auto* vals = c_val + c_offset;
+    const auto* cols = c_col + c_offset;
     for (auto i = tib; i < size; i += BLOCK_SIZE)
         vals[i] = 0;
 

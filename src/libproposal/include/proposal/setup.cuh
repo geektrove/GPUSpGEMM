@@ -2,12 +2,12 @@
 
 #include <concepts>
 #include <cstdint>
+#include <cuda/cmath>
+#include <cuda/std/functional>
 
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 #include <cub/cub.cuh>
-#include <cuda/cmath>
-#include <cuda/std/functional>
 #include <gsl/gsl-lite.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>

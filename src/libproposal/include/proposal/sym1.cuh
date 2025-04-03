@@ -32,13 +32,12 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
                            const __grid_constant__ std::int32_t* const __restrict__ bins,
                            const __grid_constant__ std::int32_t bin_size,
                            __grid_constant__ std::int32_t* const __restrict__ nnzs) {
-    static_assert(utils::ispow2(BLOCK_SIZE));
-    static_assert(utils::ispow2(TOTAL_TABLE_SIZE));
-    static_assert(utils::ispow2(PWARP_SIZE));
-    static_assert(PWARP_SIZE <= WARP_SIZE);
-
     static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE, PWARP_SIZE);
     static constexpr auto TABLE_SIZE = utils::divpow2(TOTAL_TABLE_SIZE, ROWS_PER_BLOCK);
+
+    static_assert(utils::ispow2(BLOCK_SIZE));
+    static_assert(utils::ispow2(TOTAL_TABLE_SIZE));
+    static_assert(PWARP_SIZE <= WARP_SIZE);
     static_assert(TOTAL_TABLE_SIZE % ROWS_PER_BLOCK == 0);
 
     extern __shared__ cuda::std::byte smem[];
@@ -52,7 +51,6 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto pib = utils::divpow2(tib, PWARP_SIZE);
 
     auto* s_tables = reinterpret_cast<std::int32_t*>(smem);
-
     for (auto i = tib; i < TOTAL_TABLE_SIZE; i += BLOCK_SIZE)
         s_tables[i] = HASH_EMPTY;
     block.sync();
@@ -62,7 +60,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
         return;
     auto* s_table = s_tables + (static_cast<ptrdiff_t>(pib * TABLE_SIZE));
 
-    //Aggregate column indices in the hash table
+    // Aggregate column indices in hash table
     const auto row = bins[row_id];
     assert(nnzs[row] <= TABLE_SIZE);
     std::int32_t l_nnz = 0;
@@ -105,11 +103,11 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
-
     for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
         s_table[i] = HASH_EMPTY;
     block.sync();
 
+    // Aggregate column indices in hash table
     const auto row = bins[grid.block_rank()];
     assert(nnzs[row] <= TABLE_SIZE);
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
@@ -165,12 +163,12 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
 
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
     auto* s_nnz = s_table + TABLE_SIZE;
-
     for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
         s_table[i] = HASH_EMPTY;
     cg::invoke_one(block, [&] { *s_nnz = 0; });
     block.sync();
 
+    // Aggregate column indices in hash table
     const auto row = bins[grid.block_rank()];
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
@@ -232,6 +230,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
         table[i] = HASH_EMPTY;
     block.sync();
 
+    // Aggregate column indices in hash table
     const auto row = bins[grid.block_rank()];
     assert(nnzs[row] <= table_size);
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
@@ -329,7 +328,7 @@ void sym1(const utils::DeviceCSR<T>& A,
                             meta.streams[Params::SYM1_MAX_SMEM_BIN]);
     }
 
-    // Handle remaining bins
+    // Handle regular bins
     constexpr_for<Params::SYM1_MAX_SMEM_BIN - 1, -1, -1>(
         [&]<std::int32_t I>(std::integral_constant<std::int32_t, I> ARG) {
             static constexpr auto BIN = ARG.value;
