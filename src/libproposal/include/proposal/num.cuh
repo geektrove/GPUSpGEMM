@@ -227,8 +227,8 @@ void num(const utils::DeviceCSR<T>& A,
                              C.val);
     }
 
-    // Handle smem bins
-    constexpr_for<Params::NUM_SMEM_BIN_BEGIN, Params::NUM_PWARP_BIN, -1>(
+    // Handle regular bins
+    constexpr_for<Params::NUM_GLOBAL_MEM_BIN - 1, -1, -1>(
         [&]<std::int32_t I>(std::integral_constant<std::int32_t, I> ARG) {
             static constexpr auto BIN = ARG.value;
             SPDLOG_DEBUG("NUM bin {} size is {}", BIN, meta.h_bin_sizes[BIN]);
@@ -236,63 +236,57 @@ void num(const utils::DeviceCSR<T>& A,
                 return;
 
             static constexpr auto BLOCK_SIZE = Params::NUM_BLOCK_SIZES[BIN];
+            static constexpr auto PWARP_SIZE = Params::NUM_PWARP_SIZES[BIN];
             static constexpr auto ARRAY_SIZE = Params::NUM_ARRAY_SIZES[BIN];
             static constexpr auto SMEM = Params::NUM_ARRAY_SIZES[BIN] * ItemByteSize;
 
-            utils::handle_cuda_error(
-                cudaFuncSetAttribute(k_num_smem<T, BLOCK_SIZE, ARRAY_SIZE>,
-                                     cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                     SMEM));
-            utils::launch_kernel(k_num_smem<T, BLOCK_SIZE, ARRAY_SIZE>,
-                                 meta.h_bin_sizes[BIN],
-                                 BLOCK_SIZE,
-                                 SMEM,
-                                 meta.streams[BIN],
-                                 A.rpt,
-                                 A.col,
-                                 A.val,
-                                 B.rpt,
-                                 B.col,
-                                 B.val,
-                                 C.rpt,
-                                 C.col,
-                                 meta.d_bins + meta.h_bin_offsets[BIN],
-                                 C.val);
+            if constexpr (PWARP_SIZE > 0) {
+                static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE,
+                                                                      PWARP_SIZE);
+
+                utils::handle_cuda_error(cudaFuncSetAttribute(
+                    k_num_smem_pwarp<T, BLOCK_SIZE, PWARP_SIZE, ARRAY_SIZE>,
+                    cudaFuncAttributeMaxDynamicSharedMemorySize,
+                    SMEM));
+                utils::launch_kernel(
+                    k_num_smem_pwarp<T, BLOCK_SIZE, PWARP_SIZE, ARRAY_SIZE>,
+                    cuda::ceil_div(meta.h_bin_sizes[BIN], ROWS_PER_BLOCK),
+                    BLOCK_SIZE,
+                    SMEM,
+                    meta.streams[BIN],
+                    A.rpt,
+                    A.col,
+                    A.val,
+                    B.rpt,
+                    B.col,
+                    B.val,
+                    C.rpt,
+                    C.col,
+                    meta.d_bins + meta.h_bin_offsets[BIN],
+                    meta.h_bin_sizes[BIN],
+                    C.val);
+            } else {
+                utils::handle_cuda_error(
+                    cudaFuncSetAttribute(k_num_smem<T, BLOCK_SIZE, ARRAY_SIZE>,
+                                         cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                         SMEM));
+                utils::launch_kernel(k_num_smem<T, BLOCK_SIZE, ARRAY_SIZE>,
+                                     meta.h_bin_sizes[BIN],
+                                     BLOCK_SIZE,
+                                     SMEM,
+                                     meta.streams[BIN],
+                                     A.rpt,
+                                     A.col,
+                                     A.val,
+                                     B.rpt,
+                                     B.col,
+                                     B.val,
+                                     C.rpt,
+                                     C.col,
+                                     meta.d_bins + meta.h_bin_offsets[BIN],
+                                     C.val);
+            }
         });
-
-    // Handle pwarp bin
-    SPDLOG_DEBUG("NUM bin {} size is {}",
-                 Params::NUM_PWARP_BIN,
-                 meta.h_bin_sizes[Params::NUM_PWARP_BIN]);
-    if (meta.h_bin_sizes[Params::NUM_PWARP_BIN] > 0) {
-        static constexpr auto BLOCK_SIZE = Params::NUM_BLOCK_SIZES[Params::NUM_PWARP_BIN];
-        static constexpr auto ARRAY_SIZE = Params::NUM_ARRAY_SIZES[Params::NUM_PWARP_BIN];
-        static constexpr auto PWARP_SIZE = Params::NUM_PWARP_SIZE;
-        static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE, PWARP_SIZE);
-        static constexpr auto SMEM = ARRAY_SIZE * ItemByteSize;
-
-        utils::handle_cuda_error(
-            cudaFuncSetAttribute(k_num_smem_pwarp<T, BLOCK_SIZE, PWARP_SIZE, ARRAY_SIZE>,
-                                 cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                 SMEM));
-        utils::launch_kernel(
-            k_num_smem_pwarp<T, BLOCK_SIZE, PWARP_SIZE, ARRAY_SIZE>,
-            cuda::ceil_div(meta.h_bin_sizes[Params::NUM_PWARP_BIN], ROWS_PER_BLOCK),
-            BLOCK_SIZE,
-            SMEM,
-            meta.streams[Params::NUM_PWARP_BIN],
-            A.rpt,
-            A.col,
-            A.val,
-            B.rpt,
-            B.col,
-            B.val,
-            C.rpt,
-            C.col,
-            meta.d_bins + meta.h_bin_offsets[Params::NUM_PWARP_BIN],
-            meta.h_bin_sizes[Params::NUM_PWARP_BIN],
-            C.val);
-    }
 
     // Wait for all bins to finish
     for (std::int32_t i = 0; i < Params::NUM_N_BINS; i++)

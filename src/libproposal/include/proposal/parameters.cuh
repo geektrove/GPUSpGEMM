@@ -72,18 +72,19 @@ struct Parameters<CC86> {
     // Numeric
     //
 
-    static constexpr std::int32_t NUM_N_BINS = 6;
-
-    static constexpr std::int32_t NUM_PWARP_BIN = 0;
-    static constexpr std::int32_t NUM_PWARP_SIZE = 8;
-    static constexpr std::int32_t NUM_SMEM_BIN_BEGIN = 4;
-    static constexpr std::int32_t NUM_GLOBAL_MEM_BIN = 5;
-
-    using NUM_CUDA_ARRAY = cuda::std::array<std::int32_t, NUM_N_BINS>;
-    static constexpr NUM_CUDA_ARRAY NUM_BLOCK_SIZES = {512, 128, 256, 512, 1024, 1024};
-    static constexpr NUM_CUDA_ARRAY NUM_ARRAY_SIZES =
+    static constexpr cuda::std::array NUM_BLOCK_SIZES = {512, 128, 256, 512, 1024, 1024};
+    static constexpr cuda::std::array NUM_PWARP_SIZES = {8, 0, 0, 0, 0, 0};
+    static constexpr cuda::std::array NUM_ARRAY_SIZES =
         {2752, 624, 1336, 2758, 8448, INT32_MAX};
-    static constexpr NUM_CUDA_ARRAY NUM_RANGES = {43, 624, 1336, 2758, 8448, INT32_MAX};
+    static constexpr cuda::std::array NUM_RANGES = {43, 624, 1336, 2758, 8448, INT32_MAX};
+
+    static_assert(NUM_BLOCK_SIZES.size() == NUM_PWARP_SIZES.size());
+    static_assert(NUM_BLOCK_SIZES.size() == NUM_ARRAY_SIZES.size());
+    static_assert(NUM_BLOCK_SIZES.size() == NUM_RANGES.size());
+
+    static constexpr auto NUM_N_BINS = gsl::narrow_cast<std::int32_t>(
+        NUM_BLOCK_SIZES.size());
+    static constexpr auto NUM_GLOBAL_MEM_BIN = NUM_N_BINS - 1;
 
     //
     // General
