@@ -1,8 +1,3 @@
-function(add_executable_wrapped_benchmark name)
-    add_executable_wrapped(${name} ${ARGN})
-    target_link_libraries(${name} PRIVATE benchmark::benchmark)
-endfunction()
-
 add_executable_wrapped(cusparse cusparse.cu)
 target_link_libraries(cusparse PRIVATE libcusparse)
 target_link_libraries(cusparse PRIVATE CLI11::CLI11)

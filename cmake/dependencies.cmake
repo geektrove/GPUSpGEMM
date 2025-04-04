@@ -18,17 +18,6 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/gabime/spdlog.git
     GIT_TAG v1.15.1
     SYSTEM)
-set(BENCHMARK_ENABLE_GTEST_TESTS
-    OFF
-    CACHE BOOL "" FORCE)
-set(BENCHMARK_ENABLE_TESTING
-    OFF
-    CACHE BOOL "" FORCE)
-FetchContent_Declare(
-    benchmark
-    GIT_REPOSITORY https://github.com/google/benchmark.git
-    GIT_TAG v1.9.1
-    SYSTEM)
 FetchContent_Declare(
     nvtx3
     GIT_REPOSITORY https://github.com/NVIDIA/NVTX.git
@@ -42,7 +31,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(gsl-lite)
 FetchContent_MakeAvailable(fmt)
-FetchContent_MakeAvailable(benchmark)
 FetchContent_MakeAvailable(spdlog)
 FetchContent_MakeAvailable(nvtx3)
 FetchContent_MakeAvailable(CLI11)
