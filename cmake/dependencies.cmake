@@ -34,9 +34,15 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/NVIDIA/NVTX.git
     GIT_TAG v3.1.1
     SOURCE_SUBDIR c/ SYSTEM)
+FetchContent_Declare(
+    CLI11
+    GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+    GIT_TAG v2.5.0
+)
 
 FetchContent_MakeAvailable(gsl-lite)
 FetchContent_MakeAvailable(fmt)
 FetchContent_MakeAvailable(benchmark)
 FetchContent_MakeAvailable(spdlog)
 FetchContent_MakeAvailable(nvtx3)
+FetchContent_MakeAvailable(CLI11)
