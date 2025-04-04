@@ -13,6 +13,11 @@ import scipy.io
 URLS = [
     "https://sparse.tamu.edu/mat/Williams/webbase-1M.mat",
     "https://sparse.tamu.edu/mat/Williams/pdb1HYS.mat",
+    "https://sparse.tamu.edu/mat/Williams/consph.mat",
+    "https://sparse.tamu.edu/mat/Williams/cant.mat",
+    "https://sparse.tamu.edu/mat/Williams/mac_econ_fwd500.mat",
+    "https://sparse.tamu.edu/mat/Williams/mc2depi.mat",
+    "https://sparse.tamu.edu/mat/Williams/cop20k_A.mat",
 ]
 
 logger = logging.getLogger(__name__)
