@@ -17,6 +17,5 @@ target_link_libraries(opsparse_benchmark PRIVATE libopsparse)
 
 add_executable_wrapped(proposal proposal.cu)
 target_link_libraries(proposal PRIVATE libproposal)
-
-add_executable_wrapped_benchmark(proposal_benchmark proposal_benchmark.cu)
-target_link_libraries(proposal_benchmark PRIVATE libproposal)
+target_link_libraries(proposal PRIVATE libcusparse)
+target_link_libraries(proposal PRIVATE CLI11::CLI11)
