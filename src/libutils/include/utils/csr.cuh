@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <concepts>
 #include <cstdint>
 #include <filesystem>
@@ -41,6 +43,10 @@ struct CSR {
 
     template<std::floating_point T_, Location L_>
     friend auto swap(CSR<T_, L_>&, CSR<T_, L_>&) noexcept -> void;
+
+    template<std::floating_point T_, Location L_>
+    friend auto operator==(const CSR<T_, L_>&, const CSR<T_, L_>&) noexcept -> bool
+    requires(L_ == Location::Host);
 
     auto release() -> void;
 };
@@ -180,6 +186,25 @@ inline auto swap(CSR<T, L>& lhs, CSR<T, L>& rhs) noexcept -> void {
     swap(lhs.rpt, rhs.rpt);
     swap(lhs.col, rhs.col);
     swap(lhs.val, rhs.val);
+}
+
+template<std::floating_point T, Location L>
+inline auto operator==(const CSR<T, L>& lhs, const CSR<T, L>& rhs) noexcept -> bool
+requires(L == Location::Host)
+{
+    if (&lhs == &rhs)
+        return true;
+    if (lhs.nnz != rhs.nnz || lhs.m != rhs.m || lhs.n != rhs.n)
+        return false;
+    if (!std::equal(lhs.rpt, lhs.rpt + lhs.m + 1, rhs.rpt))
+        return false;
+    if (!std::equal(lhs.col, lhs.col + lhs.nnz, rhs.col))
+        return false;
+    return std::equal(lhs.val, lhs.val + lhs.nnz, rhs.val, [](const T& l, const T& r) {
+        static constexpr T rtol = 1e-5;
+        static constexpr T atol = 1e-8;
+        return std::fabs(l - r) <= (atol + rtol * std::fabs(r));
+    });
 }
 
 template<std::floating_point T, Location L>
