@@ -96,7 +96,13 @@ __launch_bounds__(BLOCK_SIZE) __global__
                      const __grid_constant__ std::int32_t* const __restrict__ b_col,
                      const __grid_constant__ std::int32_t* const __restrict__ bins,
                      __grid_constant__ std::int32_t* const __restrict__ nnzs) {
+    using ReduceT = cub::BlockReduce<std::int32_t, BLOCK_SIZE>;
+    using ReduceTempStorageT = typename ReduceT::TempStorage;
+
+    static_assert(utils::ispow2(BLOCK_SIZE));
     static_assert(utils::ispow2(TABLE_SIZE));
+    static_assert(TABLE_SIZE % BLOCK_SIZE == 0);
+    static_assert(sizeof(ReduceTempStorageT) <= TABLE_SIZE * sizeof(std::int32_t));
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -136,24 +142,21 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
     block.sync();
 
-    using ReduceT = cub::BlockReduce<std::int32_t, BLOCK_SIZE>;
-    using ReduceTempStorageT = typename ReduceT::TempStorage;
     auto* reduce_storage = reinterpret_cast<ReduceTempStorageT*>(smem);
     const auto nnz = ReduceT(*reduce_storage).Sum(l_nnz);
     cg::invoke_one(block, [&] { nnzs[row] = nnz; });
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
-__launch_bounds__(BLOCK_SIZE) __global__
-    void k_sym1_smem_max(
-        const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-        const __grid_constant__ std::int32_t* const __restrict__ a_col,
-        const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-        const __grid_constant__ std::int32_t* const __restrict__ b_col,
-        const __grid_constant__ std::int32_t* const __restrict__ bins,
-        __grid_constant__ std::int32_t* const __restrict__ nnzs,
-        __grid_constant__ std::int32_t* const __restrict__ fail_bin,
-        __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
+__launch_bounds__(BLOCK_SIZE) __global__ void k_sym1_smem_max(
+    const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+    const __grid_constant__ std::int32_t* const __restrict__ a_col,
+    const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+    const __grid_constant__ std::int32_t* const __restrict__ b_col,
+    const __grid_constant__ std::int32_t* const __restrict__ bins,
+    __grid_constant__ std::int32_t* const __restrict__ nnzs,
+    __grid_constant__ std::int32_t* const __restrict__ fail_bin,
+    __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
     static constexpr auto THRESHOLD = gsl::narrow_cast<std::int32_t>(TABLE_SIZE
                                                                      * SYM1_RANGE_RATIO);
 
