@@ -41,7 +41,7 @@ template<std::floating_point T,
          std::int32_t BLOCK_SIZE,
          std::int32_t PWARP_SIZE,
          std::int32_t TOTAL_ARRAY_SIZE>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_num_smem_pwarp(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
                           const __grid_constant__ std::int32_t* const __restrict__ a_col,
                           const __grid_constant__ T* const __restrict__ a_val,
@@ -105,7 +105,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
 }
 
 template<std::floating_point T, std::int32_t BLOCK_SIZE, std::int32_t ARRAY_SIZE>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_num_smem(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
                     const __grid_constant__ std::int32_t* const __restrict__ a_col,
                     const __grid_constant__ T* const __restrict__ a_val,
@@ -154,7 +154,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
 }
 
 template<std::floating_point T, std::int32_t BLOCK_SIZE>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_num_global(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
                       const __grid_constant__ std::int32_t* const __restrict__ a_col,
                       const __grid_constant__ T* const __restrict__ a_val,

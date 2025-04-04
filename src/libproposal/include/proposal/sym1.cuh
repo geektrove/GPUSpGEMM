@@ -26,7 +26,7 @@ namespace proposal {
 namespace cg = cooperative_groups;
 
 template<std::int32_t BLOCK_SIZE, std::int32_t PWARP_SIZE, std::int32_t TOTAL_TABLE_SIZE>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_sym1_smem_pwarp(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
                            const __grid_constant__ std::int32_t* const __restrict__ a_col,
                            const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
@@ -89,7 +89,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_sym1_smem(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
                      const __grid_constant__ std::int32_t* const __restrict__ a_col,
                      const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
@@ -144,7 +144,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_sym1_smem_max(
         const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
         const __grid_constant__ std::int32_t* const __restrict__ a_col,
@@ -210,7 +210,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
 }
 
 template<std::int32_t BLOCK_SIZE>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_sym1_global(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
                        const __grid_constant__ std::int32_t* const __restrict__ a_col,
                        const __grid_constant__ std::int32_t* const __restrict__ b_rpt,

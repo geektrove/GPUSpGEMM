@@ -128,13 +128,6 @@ __device__ consteval auto get_ranges() {
     }
 #endif
 }
-
-__device__ consteval auto get_minctapersm(const std::int32_t block_size) -> std::int32_t {
-#ifdef __CUDA_ARCH__
-    return Parameters<__CUDA_ARCH__>::MAX_THREADS_PER_SM / block_size;
-#else
-    return 1;
 #endif
-}
 
 } // namespace proposal

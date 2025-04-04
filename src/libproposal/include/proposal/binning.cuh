@@ -34,7 +34,7 @@ __forceinline__ __device__ auto find_bin(const std::int32_t x) -> std::int32_t {
 }
 
 template<std::int32_t BLOCK_SIZE, BinningType BinType, typename GetValueF>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_binning1(const __grid_constant__ std::int32_t m,
                     __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
                     GetValueF get_value) {
@@ -63,7 +63,7 @@ __launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
 }
 
 template<std::int32_t BLOCK_SIZE, BinningType BinType, typename GetValueF>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_binning2(const __grid_constant__ std::int32_t m,
                     const __grid_constant__ std::int32_t* const __restrict__ bin_offsets,
                     __grid_constant__ std::int32_t* const __restrict__ bin_sizes,

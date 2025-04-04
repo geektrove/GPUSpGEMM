@@ -23,7 +23,7 @@ namespace proposal {
 namespace cg = cooperative_groups;
 
 template<std::int32_t BLOCK_SIZE>
-__launch_bounds__(BLOCK_SIZE, get_minctapersm(BLOCK_SIZE)) __global__
+__launch_bounds__(BLOCK_SIZE) __global__
     void k_compute_nip(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
                        const __grid_constant__ std::int32_t* const __restrict__ a_col,
                        const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
