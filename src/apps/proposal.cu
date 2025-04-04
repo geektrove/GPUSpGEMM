@@ -1,11 +1,12 @@
 #include <cstdlib>
+#include <functional>
 #include <thread>
 
 #include <CLI/CLI.hpp>
 #include <fmt/chrono.h>
 #include <fmt/core.h>
 #include <nvtx3/nvtx3.hpp>
-#include <spdlog/cfg/env.h>
+#include <spdlog/spdlog.h>
 
 #include <cusparse/cusparse.cuh>
 #include <proposal/proposal.cuh>
