@@ -128,6 +128,5 @@ __device__ consteval auto get_ranges() {
     }
 #endif
 }
-#endif
 
 } // namespace proposal
