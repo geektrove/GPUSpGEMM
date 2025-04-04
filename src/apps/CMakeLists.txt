@@ -5,9 +5,7 @@ endfunction()
 
 add_executable_wrapped(cusparse cusparse.cu)
 target_link_libraries(cusparse PRIVATE libcusparse)
-
-add_executable_wrapped_benchmark(cusparse_benchmark cusparse_benchmark.cu)
-target_link_libraries(cusparse_benchmark PRIVATE libcusparse)
+target_link_libraries(cusparse PRIVATE CLI11::CLI11)
 
 add_executable_wrapped(opsparse opsparse.cu)
 target_link_libraries(opsparse PRIVATE libopsparse)
