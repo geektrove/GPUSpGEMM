@@ -56,7 +56,7 @@ struct Parameters<CC86> {
     static constexpr cuda::std::array SYM2_TABLE_SIZES =
         {4096, 8192, 1024, 2048, 8192, 16384, 25343, INT32_MAX};
     static constexpr cuda::std::array SYM2_SMEM_SIZES =
-        {16384, 32768, 4224, 8448, 33792, 67584, 101'376, INT32_MAX};
+        {16896, 33280, 4100, 8196, 32772, 65540, 101'376, INT32_MAX};
     static constexpr cuda::std::array SYM2_RANGES =
         {26, 53, 853, 1706, 6826, 13653, 21119, INT32_MAX};
 
