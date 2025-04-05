@@ -36,6 +36,7 @@ function(_customize_target_wrapped name visibility)
         $<$<CONFIG:Release,RelWithDebInfo>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_WARN>
         $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE>)
 
+    target_link_libraries(${name} ${visibility} CUDA::cudart)
     target_link_libraries(${name} ${visibility} gsl-lite)
     target_link_libraries(${name} ${visibility} fmt::fmt)
     target_link_libraries(${name} ${visibility} spdlog::spdlog)
