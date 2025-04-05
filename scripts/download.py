@@ -6,19 +6,41 @@ from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.request import urlretrieve
+from contextlib import suppress
 
 import numpy as np
 import scipy.io
 
-URLS = [
-    "https://sparse.tamu.edu/mat/Williams/webbase-1M.mat",
-    "https://sparse.tamu.edu/mat/Williams/pdb1HYS.mat",
-    "https://sparse.tamu.edu/mat/Williams/consph.mat",
-    "https://sparse.tamu.edu/mat/Williams/cant.mat",
-    "https://sparse.tamu.edu/mat/Williams/mac_econ_fwd500.mat",
-    "https://sparse.tamu.edu/mat/Williams/mc2depi.mat",
-    "https://sparse.tamu.edu/mat/Williams/cop20k_A.mat",
+BASE_URL = "https://sparse.tamu.edu/mat"
+MATRICES = [
+    "JGD_Homology/m133-b3",
+    "Williams/mac_econ_fwd500",
+    "Pajek/patents_main",
+    "Williams/webbase-1M",
+    "Williams/mc2depi",
+    "Hamm/scircuit",
+    "GHS_indef/mario002",
+    "vanHeukelum/cage12",
+    "QLi/majorbasis",
+    "Um/offshore",
+    "Um/2cubes_sphere",
+    "FEMLAB/poisson3Da",
+    "Oberwolfach/filter3D",
+    # "FreeFieldTechnologies/mono_500Hz",
+    # "QCD/conf5_4-8x8-05",
+    "Williams/cant",
+    "Williams/consph",
+    "DNVS/shipsec1",
+    "Bova/rma10",
+    "DIMACS10/delaunay_n24",
+    "vanHeukelum/cage15",
+    "Gleich/wb-edu",
+    "Williams/cop20k_A",
+    "GHS_psdef/hood",
+    "Boeing/pwtk",
+    "Williams/pdb1HYS",
 ]
+URLS = [f"{BASE_URL}/{name}.mat" for name in MATRICES]
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +53,9 @@ def download_matrix(url: str, output_dir: Path) -> None:
 
     mat = scipy.io.loadmat(mat_filename)
     csr = mat["Problem"]["A"][0][0].tocsr()
+    with suppress(Exception):
+        zeros = mat["Problem"]["Zeros"][0][0].tocsr()
+        csr += zeros
     logger.info(f"Converted {mat_name} to CSR format")
 
     csr_filename = output_dir / f"{mat_name}.csr"
