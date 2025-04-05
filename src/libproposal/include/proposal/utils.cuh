@@ -15,4 +15,10 @@ void constexpr_for(F&& f) {
     }
 }
 
+__forceinline__ __device__ int dynamic_smem_size() {
+    int ret{0};
+    asm volatile("mov.u32 %0, %%dynamic_smem_size;" : "=r"(ret));
+    return ret;
+}
+
 } // namespace proposal

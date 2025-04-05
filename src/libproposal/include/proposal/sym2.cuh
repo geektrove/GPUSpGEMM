@@ -42,16 +42,22 @@ __launch_bounds__(BLOCK_SIZE) __global__
     using SortT = cub::WarpMergeSort<std::uint32_t, ITEMS_PER_THREAD, PWARP_SIZE>;
     using SortTempStorageT = typename SortT::TempStorage;
     using StoreT = cub::
-        WarpStore<std::int32_t, ITEMS_PER_THREAD, cub::WARP_STORE_DIRECT, PWARP_SIZE>;
+        WarpStore<std::int32_t, ITEMS_PER_THREAD, cub::WARP_STORE_TRANSPOSE, PWARP_SIZE>;
     using StoreTempStorageT = typename StoreT::TempStorage;
+
+    static constexpr auto SMEM = cuda::std::max(
+        {TOTAL_TABLE_SIZE * sizeof(std::int32_t),
+         ROWS_PER_BLOCK * sizeof(SortTempStorageT),
+         ROWS_PER_BLOCK * sizeof(StoreTempStorageT)});
+    static constexpr auto PWARP_SMEM = SMEM / ROWS_PER_BLOCK;
 
     static_assert(utils::ispow2(BLOCK_SIZE));
     static_assert(utils::ispow2(TOTAL_TABLE_SIZE));
     static_assert(PWARP_SIZE <= WARP_SIZE);
     static_assert(TOTAL_TABLE_SIZE % ROWS_PER_BLOCK == 0);
-    static_assert(sizeof(SortTempStorageT) % sizeof(std::int32_t) == 0);
-    static_assert(sizeof(SortTempStorageT) >= TABLE_SIZE * sizeof(std::int32_t));
-    static_assert(sizeof(SortTempStorageT) >= sizeof(StoreTempStorageT));
+    if constexpr (utils::IS_DEBUG) {
+        assert(dynamic_smem_size() == SMEM);
+    }
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -67,7 +73,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     if (row_id >= bin_size)
         return;
 
-    auto* p_smem = smem + (pib * sizeof(SortTempStorageT));
+    auto* p_smem = smem + (pib * PWARP_SMEM);
     auto* p_table = reinterpret_cast<std::int32_t*>(p_smem);
     for (auto i = tip; i < TABLE_SIZE; i += PWARP_SIZE)
         p_table[i] = HASH_EMPTY;
@@ -123,11 +129,21 @@ __launch_bounds__(BLOCK_SIZE) __global__
 
     using SortT = cub::BlockMergeSort<std::uint32_t, BLOCK_SIZE, ITEMS_PER_THREAD>;
     using SortTempStorageT = typename SortT::TempStorage;
-    using StoreT = cub::BlockStore<std::int32_t, BLOCK_SIZE, ITEMS_PER_THREAD>;
+    using StoreT = cub::BlockStore<std::int32_t,
+                                   BLOCK_SIZE,
+                                   ITEMS_PER_THREAD,
+                                   cub::BLOCK_STORE_WARP_TRANSPOSE>;
     using StoreTempStorageT = typename StoreT::TempStorage;
 
+    static_assert(utils::ispow2(BLOCK_SIZE));
     static_assert(utils::ispow2(TABLE_SIZE));
     static_assert(TABLE_SIZE % BLOCK_SIZE == 0);
+    if constexpr (utils::IS_DEBUG) {
+        static constexpr auto SMEM = cuda::std::max({TABLE_SIZE * sizeof(std::int32_t),
+                                                     sizeof(SortTempStorageT),
+                                                     sizeof(StoreTempStorageT)});
+        assert(dynamic_smem_size() == SMEM);
+    }
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -190,6 +206,11 @@ __launch_bounds__(BLOCK_SIZE) __global__
                          const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
                          const __grid_constant__ std::int32_t* const __restrict__ bins,
                          __grid_constant__ std::int32_t* const __restrict__ c_col) {
+    if constexpr (utils::IS_DEBUG) {
+        static constexpr auto SMEM = TABLE_SIZE * sizeof(std::int32_t);
+        assert(dynamic_smem_size() == SMEM);
+    }
+
     extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
