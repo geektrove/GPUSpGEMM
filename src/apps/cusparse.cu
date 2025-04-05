@@ -110,10 +110,17 @@ auto main(int argc, char** argv) -> int {
             times[i] = end - start;
         }
 
+        // Compute FLOPs
+        const auto nip = utils::get_nip(d_a, d_b);
+        const auto flop = 2.0 * nip;
+
         // Print results
         fmt::println("Timestamp: {}", std::chrono::system_clock::now());
-        for (int i = 0; i < runs; i++)
-            fmt::println("Run {:2d}: {}", i + 1, times[i]);
+        for (int i = 0; i < runs; i++) {
+            const auto seconds = std::chrono::duration<double>(times[i]).count();
+            const auto flops = flop / seconds;
+            fmt::println("Run {:2d}: {} | {} FLOPS", i + 1, times[i], flops);
+        }
     }
 
     return EXIT_SUCCESS;
