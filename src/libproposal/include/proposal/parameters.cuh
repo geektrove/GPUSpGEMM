@@ -54,11 +54,11 @@ struct Parameters<CC86> {
         {512, 512, 128, 256, 512, 1024, 1024, 1024};
     static constexpr cuda::std::array SYM2_PWARP_SIZES = {4, 4, 0, 0, 0, 0, 0, 0};
     static constexpr cuda::std::array SYM2_TABLE_SIZES =
-        {4096, 8192, 1024, 2048, 8192, 16384, 25343, 0};
+        {4096, 8192, 1024, 2048, 8192, 16384, 24576, 0};
     static constexpr cuda::std::array SYM2_SMEM_SIZES =
-        {17408, 34304, 4240, 8464, 33808, 67600, 101'376, 0};
+        {17408, 34304, 4240, 8464, 33808, 67600, 98320, 0};
     static constexpr cuda::std::array SYM2_RANGES =
-        {26, 53, 853, 1706, 6826, 13653, 21119, INT32_MAX};
+        {26, 53, 853, 1706, 6826, 13653, 20480, INT32_MAX};
 
     static_assert(SYM2_BLOCK_SIZES.size() == SYM2_PWARP_SIZES.size());
     static_assert(SYM2_BLOCK_SIZES.size() == SYM2_TABLE_SIZES.size());

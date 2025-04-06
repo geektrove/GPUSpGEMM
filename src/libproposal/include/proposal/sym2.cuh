@@ -206,9 +206,22 @@ __launch_bounds__(BLOCK_SIZE) __global__
                          const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
                          const __grid_constant__ std::int32_t* const __restrict__ bins,
                          __grid_constant__ std::int32_t* const __restrict__ c_col) {
+    static constexpr auto ITEMS_PER_THREAD = TABLE_SIZE / BLOCK_SIZE;
+
+    using SortT = cub::BlockMergeSort<std::uint32_t, BLOCK_SIZE, ITEMS_PER_THREAD>;
+    using SortTempStorageT = typename SortT::TempStorage;
+    using StoreT = cub::BlockStore<std::int32_t,
+                                   BLOCK_SIZE,
+                                   ITEMS_PER_THREAD,
+                                   cub::BLOCK_STORE_WARP_TRANSPOSE>;
+    using StoreTempStorageT = typename StoreT::TempStorage;
+
     static_assert(utils::ispow2(BLOCK_SIZE));
+    static_assert(TABLE_SIZE % BLOCK_SIZE == 0);
 #ifndef NDEBUG
-    static constexpr auto SMEM = TABLE_SIZE * sizeof(std::int32_t);
+    static constexpr auto SMEM = cuda::std::max({TABLE_SIZE * sizeof(std::int32_t),
+                                                 sizeof(SortTempStorageT),
+                                                 sizeof(StoreTempStorageT)});
     assert(dynamic_smem_size() == SMEM);
 #endif
 
@@ -219,10 +232,8 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
-    auto* s_offset = s_table + TABLE_SIZE;
     for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
         s_table[i] = HASH_EMPTY;
-    cg::invoke_one(block, [&] { *s_offset = 0; });
     block.sync();
 
     // Aggregate column indices in hash table
@@ -247,28 +258,23 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
     block.sync();
 
-    // Condense at the start of the table
-    for (auto offset = 0; offset < TABLE_SIZE; offset += BLOCK_SIZE) {
-        const auto i = offset + tib;
-        const auto col = i < TABLE_SIZE ? s_table[i] : HASH_EMPTY;
-        block.sync();
-        if (col != HASH_EMPTY)
-            s_table[atomicAdd_block(s_offset, 1)] = col;
-    }
+    // Prepare cols for sorting
+    std::int32_t l_cols[ITEMS_PER_THREAD];
+    for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
+        l_cols[utils::divpow2(i, BLOCK_SIZE)] = s_table[i];
+    block.sync();
+
+    // Sort using merge sort
+    auto* l_ucols = reinterpret_cast<std::uint32_t(*)[ITEMS_PER_THREAD]>(&l_cols);
+    auto* sort_storage = reinterpret_cast<SortTempStorageT*>(smem);
+    SortT(*sort_storage).Sort(*l_ucols, cuda::std::less<std::uint32_t>{});
     block.sync();
 
     // Write to C.col
     const auto c_offset = c_rpt[row];
     const auto nnz = c_rpt[row + 1] - c_offset;
-    for (auto i = tib; i < nnz; i += BLOCK_SIZE) {
-        const auto col = s_table[i];
-        std::int32_t n_less = 0;
-        for (std::int32_t j = 0; j < nnz; j++) {
-            if (s_table[j] < col)
-                n_less++;
-        }
-        c_col[c_offset + n_less] = col;
-    }
+    auto* store_storage = reinterpret_cast<StoreTempStorageT*>(smem);
+    StoreT(*store_storage).Store(&c_col[c_offset], l_cols, nnz);
 }
 
 template<std::int32_t BLOCK_SIZE>
