@@ -95,10 +95,12 @@ __launch_bounds__(BLOCK_SIZE) __global__
     cg::wait(tile);
     tile.sync();
 
-    for (auto i = a_rpt[row] + tip; i < a_rpt[row + 1]; i += PWARP_SIZE) {
+    const auto a_rpt_end = a_rpt[row + 1];
+    for (auto i = a_rpt[row] + tip; i < a_rpt_end; i += PWARP_SIZE) {
         const auto a_value = a_val[i];
         const auto colrow = a_col[i];
-        for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
+        const auto b_rpt_end = b_rpt[colrow + 1];
+        for (auto k = b_rpt[colrow]; k < b_rpt_end; k++) {
             const auto idx = find_key(s_cols, size, b_col[k]);
             atomicAdd_block(s_vals + idx, a_value * b_val[k]);
         }
@@ -150,10 +152,12 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
-    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+    const auto a_rpt_end = a_rpt[row + 1];
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt_end; i += i_step) {
         const auto a_value = a_val[i];
         const auto colrow = a_col[i];
-        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+        const auto b_rpt_end = b_rpt[colrow + 1];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt_end; k += k_step) {
             const auto idx = find_key(s_cols, size, b_col[k]);
             atomicAdd_block(s_vals + idx, a_value * b_val[k]);
         }
@@ -195,10 +199,12 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
-    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+    const auto a_rpt_end = a_rpt[row + 1];
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt_end; i += i_step) {
         const auto a_value = a_val[i];
         const auto colrow = a_col[i];
-        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+        const auto b_rpt_end = b_rpt[colrow + 1];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt_end; k += k_step) {
             const auto idx = find_key(cols, size, b_col[k]);
             atomicAdd_block(vals + idx, a_value * b_val[k]);
         }

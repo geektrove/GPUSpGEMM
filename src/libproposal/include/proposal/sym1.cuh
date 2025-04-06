@@ -70,9 +70,11 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto row = bins[row_id];
     assert(nnzs[row] <= TABLE_SIZE);
     std::int32_t l_nnz = 0;
-    for (auto i = a_rpt[row] + tip; i < a_rpt[row + 1]; i += PWARP_SIZE) {
+    const auto a_rpt_end = a_rpt[row + 1];
+    for (auto i = a_rpt[row] + tip; i < a_rpt_end; i += PWARP_SIZE) {
         const auto colrow = a_col[i];
-        for (auto k = b_rpt[colrow]; k < b_rpt[colrow + 1]; k++) {
+        const auto b_rpt_end = b_rpt[colrow + 1];
+        for (auto k = b_rpt[colrow]; k < b_rpt_end; k++) {
             const auto key = b_col[k];
             auto hash = utils::modpow2(key * HASH_SCALE, TABLE_SIZE);
             while (true) {
@@ -132,9 +134,11 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
     std::int32_t l_nnz = 0;
-    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+    const auto a_rpt_end = a_rpt[row + 1];
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt_end; i += i_step) {
         const auto colrow = a_col[i];
-        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+        const auto b_rpt_end = b_rpt[colrow + 1];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt_end; k += k_step) {
             const auto key = b_col[k];
             auto hash = utils::modpow2(key * HASH_SCALE, TABLE_SIZE);
             while (true) {
@@ -195,9 +199,11 @@ __launch_bounds__(BLOCK_SIZE) __global__ void k_sym1_smem_max(
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
     cuda::std::invoke([&] {
-        for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+        const auto a_rpt_end = a_rpt[row + 1];
+        for (auto i = a_rpt[row] + i_offset; i < a_rpt_end; i += i_step) {
             const auto colrow = a_col[i];
-            for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+            const auto b_rpt_end = b_rpt[colrow + 1];
+            for (auto k = b_rpt[colrow] + k_offset; k < b_rpt_end; k += k_step) {
                 const auto key = b_col[k];
                 auto hash = (key * HASH_SCALE) % TABLE_SIZE;
                 while (true) {
@@ -261,9 +267,11 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
     const auto k_step = WARP_SIZE;
     std::int32_t l_nnz = 0;
-    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
+    const auto a_rpt_end = a_rpt[row + 1];
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt_end; i += i_step) {
         const auto colrow = a_col[i];
-        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
+        const auto b_rpt_end = b_rpt[colrow + 1];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt_end; k += k_step) {
             const auto key = b_col[k];
             auto hash = (key * HASH_SCALE) % table_size;
             while (true) {

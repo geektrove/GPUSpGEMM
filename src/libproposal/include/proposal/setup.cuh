@@ -41,27 +41,32 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tiw = gsl::narrow_cast<std::int32_t>(warp.thread_rank());
 
-    const auto row_length = tig < m ? a_rpt[tig + 1] - a_rpt[tig] : 0;
+    const auto a_rpt_start = tig < m ? a_rpt[tig] : 0;
+    const auto a_rpt_end = tig < m ? a_rpt[tig + 1] : 0;
+
+    const auto row_length = a_rpt_end - a_rpt_start;
     const auto row_length_max = cg::reduce(warp, row_length, cg::greater<std::int32_t>{});
     auto l_nip = cuda::std::invoke([&] {
-        // If the maximum row length across warp is greater than threshold,
+        // If the maximum row length across warp is greater than warp size,
         // use a warp per row
         if (row_length_max >= WARP_SIZE) {
             std::int32_t thread_row_nip = 0;
-            auto row_begin = utils::divpow2(tig, WARP_SIZE) * WARP_SIZE;
-            for (std::int32_t row_offset = 0; row_offset < WARP_SIZE; row_offset++) {
-                const auto row = row_begin + row_offset;
+            auto row_offset = utils::divpow2(tig, WARP_SIZE) * WARP_SIZE;
+            for (std::int32_t riw = 0; riw < WARP_SIZE; riw++) {
+                const auto row = row_offset + riw;
                 if (row >= m)
                     break;
+                const auto start = warp.shfl(a_rpt_start, riw);
+                const auto end = warp.shfl(a_rpt_end, riw);
                 std::int32_t l_row_nip = 0;
-                for (auto j = a_rpt[row] + tiw; j < a_rpt[row + 1]; j += WARP_SIZE) {
+                for (auto j = start + tiw; j < end; j += WARP_SIZE) {
                     const auto col = a_col[j];
                     l_row_nip += b_rpt[col + 1] - b_rpt[col];
                 }
                 const auto row_nip = cg::reduce(warp,
                                                 l_row_nip,
                                                 cg::plus<std::int32_t>{});
-                if (row_offset == tiw) {
+                if (riw == tiw) {
                     thread_row_nip = row_nip;
                     nips[row] = row_nip;
                 }
@@ -70,15 +75,14 @@ __launch_bounds__(BLOCK_SIZE) __global__
         }
 
         // Otherwise, use a single thread per row
-        const auto row = tig;
-        if (row >= m)
+        if (tig >= m)
             return 0;
         std::int32_t row_nip = 0;
-        for (auto j = a_rpt[row]; j < a_rpt[row + 1]; j++) {
+        for (auto j = a_rpt_start; j < a_rpt_end; j++) {
             const auto col = a_col[j];
             row_nip += b_rpt[col + 1] - b_rpt[col];
         }
-        nips[row] = row_nip;
+        nips[tig] = row_nip;
         return row_nip;
     });
 
