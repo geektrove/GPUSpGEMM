@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <cstdlib>
+#include <type_traits>
 
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
@@ -19,6 +20,7 @@
 namespace proposal {
 
 template<std::floating_point T, typename Params>
+requires(std::is_same_v<T, float> || std::is_same_v<T, double>)
 auto proposal_inner(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     -> utils::DeviceCSR<T> {
     NVTX3_FUNC_RANGE();
@@ -59,7 +61,11 @@ auto proposal_inner(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 
     // Numeric binning
     SPDLOG_DEBUG("Starting numeric binning phase");
-    binning<T, Params, BinningType::NUM>(C, meta, get_value_difference);
+    if constexpr (std::is_same_v<T, float>) {
+        binning<T, Params, BinningType::NUM_F32>(C, meta, get_value_difference);
+    } else {
+        binning<T, Params, BinningType::NUM_F64>(C, meta, get_value_difference);
+    }
     SPDLOG_DEBUG("Finished numeric binning phase");
 
     // Numeric
@@ -76,6 +82,7 @@ auto proposal_inner(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
 }
 
 template<std::floating_point T>
+requires(std::is_same_v<T, float> || std::is_same_v<T, double>)
 auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
     -> utils::DeviceCSR<T> {
     NVTX3_FUNC_RANGE();

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cuda/std/cstddef>
+#include <type_traits>
 
 #include <cooperative_groups.h>
 #include <cooperative_groups/memcpy_async.h>
@@ -211,12 +212,7 @@ void num(const utils::DeviceCSR<T>& A,
          Meta<Params>& meta) {
     NVTX3_FUNC_RANGE();
 
-    static constexpr auto IdxByteSize = gsl::narrow_cast<std::int32_t>(
-        sizeof(std::int32_t));
-    static constexpr auto ValueByteSize = gsl::narrow_cast<std::int32_t>(sizeof(T));
-    static constexpr auto ItemByteSize = IdxByteSize + ValueByteSize;
-
-    // Handle the global memory bin
+    // Handle global memory bin
     const auto global_mem_bin_size = meta.h_bin_sizes[Params::NUM_GLOBAL_MEM_BIN];
     SPDLOG_DEBUG("NUM bin {} size is {}",
                  Params::NUM_GLOBAL_MEM_BIN,
@@ -252,8 +248,12 @@ void num(const utils::DeviceCSR<T>& A,
 
             static constexpr auto BLOCK_SIZE = Params::NUM_BLOCK_SIZES[BIN];
             static constexpr auto PWARP_SIZE = Params::NUM_PWARP_SIZES[BIN];
-            static constexpr auto ARRAY_SIZE = Params::NUM_ARRAY_SIZES[BIN];
-            static constexpr auto SMEM = Params::NUM_ARRAY_SIZES[BIN] * ItemByteSize;
+            static constexpr auto ARRAY_SIZE = std::is_same_v<T, float>
+                                                   ? Params::NUM_ARRAY_SIZES_F32[BIN]
+                                                   : Params::NUM_ARRAY_SIZES_F64[BIN];
+            static constexpr auto SMEM = std::is_same_v<T, float>
+                                             ? Params::NUM_SMEM_SIZES_F32[BIN]
+                                             : Params::NUM_SMEM_SIZES_F64[BIN];
 
             if constexpr (PWARP_SIZE > 0) {
                 static constexpr auto ROWS_PER_BLOCK = utils::divpow2(BLOCK_SIZE,
