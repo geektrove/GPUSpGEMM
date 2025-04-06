@@ -30,7 +30,8 @@ __launch_bounds__(BLOCK_SIZE) __global__
                        const __grid_constant__ std::int32_t m,
                        __grid_constant__ std::int32_t* const __restrict__ nips,
                        __grid_constant__ std::int32_t* const __restrict__ max_nip) {
-    using ReduceT = cub::BlockReduce<std::int32_t, BLOCK_SIZE>;
+    using ReduceT = cub::
+        BlockReduce<std::int32_t, BLOCK_SIZE, cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>;
 
     __shared__ typename ReduceT::TempStorage s_storage;
 

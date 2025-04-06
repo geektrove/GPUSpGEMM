@@ -96,7 +96,8 @@ __launch_bounds__(BLOCK_SIZE) __global__
                      const __grid_constant__ std::int32_t* const __restrict__ b_col,
                      const __grid_constant__ std::int32_t* const __restrict__ bins,
                      __grid_constant__ std::int32_t* const __restrict__ nnzs) {
-    using ReduceT = cub::BlockReduce<std::int32_t, BLOCK_SIZE>;
+    using ReduceT = cub::
+        BlockReduce<std::int32_t, BLOCK_SIZE, cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>;
     using ReduceTempStorageT = typename ReduceT::TempStorage;
 
     static_assert(utils::ispow2(BLOCK_SIZE));
@@ -222,7 +223,8 @@ __launch_bounds__(BLOCK_SIZE) __global__
                        const __grid_constant__ std::int32_t table_size,
                        __grid_constant__ std::int32_t* const __restrict__ tables,
                        __grid_constant__ std::int32_t* const __restrict__ nnzs) {
-    using ReduceT = cub::BlockReduce<std::int32_t, BLOCK_SIZE>;
+    using ReduceT = cub::
+        BlockReduce<std::int32_t, BLOCK_SIZE, cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>;
 
     __shared__ typename ReduceT::TempStorage s_storage;
 
