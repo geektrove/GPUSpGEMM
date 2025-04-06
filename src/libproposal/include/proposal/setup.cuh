@@ -38,7 +38,6 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto warp = cg::tiled_partition<WARP_SIZE>(block);
-    const auto tile = cg::tiled_partition<BLOCK_SIZE>(block);
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tiw = gsl::narrow_cast<std::int32_t>(warp.thread_rank());
 
