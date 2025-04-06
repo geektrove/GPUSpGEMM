@@ -353,10 +353,6 @@ void sym1(const utils::DeviceCSR<T>& A,
                              C.rpt,
                              d_fail_bin,
                              d_fail_bin_size);
-        utils::memcpy_async(&h_fail_bin_size,
-                            d_fail_bin_size,
-                            sizeof(h_fail_bin_size),
-                            meta.streams[Params::SYM1_MAX_SMEM_BIN]);
     }
 
     // Handle regular bins
@@ -413,6 +409,10 @@ void sym1(const utils::DeviceCSR<T>& A,
 
     // Handle fail bin
     if (max_smem_bin_size > 0) {
+        utils::memcpy_async(&h_fail_bin_size,
+                            d_fail_bin_size,
+                            sizeof(h_fail_bin_size),
+                            meta.streams[Params::SYM1_MAX_SMEM_BIN]);
         utils::stream_sync(meta.streams[Params::SYM1_MAX_SMEM_BIN]);
         SPDLOG_DEBUG("SYM1 fail bin size is {}", h_fail_bin_size);
         if (h_fail_bin_size > 0) {

@@ -159,9 +159,8 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     utils::memcpy_async(meta.h_bin_sizes,
                         meta.d_bin_sizes,
                         N_BINS * sizeof(*meta.h_bin_sizes));
-    utils::event_record(meta.events[0]);
+    utils::stream_sync();
     utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(*meta.d_bin_sizes));
-    utils::event_sync(meta.events[0]);
 
     meta.h_bin_offsets[0] = 0;
     for (int i = 0; i + 1 < N_BINS; i++)

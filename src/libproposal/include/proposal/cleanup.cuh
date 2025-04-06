@@ -24,9 +24,6 @@ auto cleanup(Meta<Params>& meta) -> void {
     SPDLOG_DEBUG("Destroy streams");
     for (auto& stream : meta.streams)
         utils::handle_cuda_error(cudaStreamDestroy(stream));
-    SPDLOG_DEBUG("Destroy events");
-    for (auto& event : meta.events)
-        utils::handle_cuda_error(cudaEventDestroy(event));
 
     utils::stream_sync();
 }

@@ -140,7 +140,7 @@ void setup(const utils::DeviceCSR<T>& A,
     auto* rpt = utils::malloc_async((C.m + 1) * sizeof(std::int32_t));
     C.rpt = static_cast<std::int32_t*>(rpt);
 
-    // Compute NIP per row in C and find the maximum
+    // Compute NIP per row in C and find maximum
     utils::memset_async(C.rpt + C.m, 0, sizeof(*C.rpt));
     utils::launch_kernel(k_compute_nip<Params::OPTIMAL_BLOCK_SIZE>,
                          cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
@@ -153,7 +153,6 @@ void setup(const utils::DeviceCSR<T>& A,
                          C.m,
                          C.rpt,
                          C.rpt + C.m);
-    utils::memcpy_async(&meta.h_max_row_nnz, C.rpt + C.m, sizeof(meta.h_max_row_nnz));
 
     // Create CUDA streams
     for (auto& stream : meta.streams)
@@ -162,10 +161,8 @@ void setup(const utils::DeviceCSR<T>& A,
     // Allocate device memory
     allocate_device_mem(C.m, meta);
 
-    // Create CUDA events
-    for (auto& event : meta.events)
-        utils::handle_cuda_error(
-            cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+    // Copy maximum NIP per row to host
+    utils::memcpy_async(&meta.h_max_row_nnz, C.rpt + C.m, sizeof(meta.h_max_row_nnz));
 
     // Synchronize streams
     utils::stream_sync(meta.streams[0]);

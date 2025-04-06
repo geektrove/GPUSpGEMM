@@ -9,7 +9,6 @@ namespace proposal {
 
 template<typename Params>
 struct Meta {
-    std::array<cudaEvent_t, N_CUDA_EVENTS> events{};        // size 1
     std::array<cudaStream_t, Params::MAX_N_BINS> streams{}; // size n_bins
 
     std::size_t cub_storage_size{};
