@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <type_traits>
 
 #include <gsl/gsl-lite.hpp>
 
@@ -132,7 +133,15 @@ requires(L == Location::Host)
     CSR<T, L> csr(nnz, m, n);
     read(csr.rpt, csr.m + 1);
     read(csr.col, csr.nnz);
-    read(csr.val, csr.nnz);
+    if constexpr (std::is_same_v<T, double>) {
+        read(csr.val, csr.nnz);
+    } else {
+        // Data are always read in double precision
+        auto* tmp = static_cast<double*>(malloc<L>(nnz * sizeof(double)));
+        read(tmp, nnz);
+        std::copy(tmp, tmp + nnz, csr.val);
+        free<L>(tmp);
+    }
 
     if (gsl::narrow_cast<unsigned long>(ifs.tellg()) < filesize)
         throw std::runtime_error("File " + filename + " is too large");
@@ -160,7 +169,15 @@ requires(L == Location::Host)
     write(&n);
     write(rpt, m + 1);
     write(col, nnz);
-    write(val, nnz);
+    if constexpr (std::is_same_v<T, double>) {
+        write(val, nnz);
+    } else {
+        // Data are always written in double precision
+        auto* tmp = static_cast<double*>(malloc<L>(nnz * sizeof(double)));
+        std::copy(this->val, this->val + nnz, tmp);
+        write(tmp, nnz);
+        free<L>(tmp);
+    }
 }
 
 template<std::floating_point T, Location L>
@@ -201,9 +218,11 @@ requires(L == Location::Host)
     if (!std::equal(lhs.col, lhs.col + lhs.nnz, rhs.col))
         return false;
     return std::equal(lhs.val, lhs.val + lhs.nnz, rhs.val, [](const T& l, const T& r) {
-        static constexpr T rtol = 1e-5;
-        static constexpr T atol = 1e-8;
-        return std::fabs(l - r) <= (atol + rtol * std::fabs(r));
+        if (l == r)
+            return true;
+        static constexpr T rtol = std::is_same_v<T, float> ? 1e-5 : 1e-7;
+        static constexpr T atol = std::is_same_v<T, float> ? 1e-8 : 1e-12;
+        return std::fabs(l - r) <= (atol + rtol * std::max(std::fabs(l), std::fabs(r)));
     });
 }
 
