@@ -136,7 +136,6 @@ __launch_bounds__(BLOCK_SIZE) __global__
     using StoreTempStorageT = typename StoreT::TempStorage;
 
     static_assert(utils::ispow2(BLOCK_SIZE));
-    static_assert(utils::ispow2(TABLE_SIZE));
     static_assert(TABLE_SIZE % BLOCK_SIZE == 0);
 #ifndef NDEBUG
     static constexpr auto SMEM = cuda::std::max({TABLE_SIZE * sizeof(std::int32_t),
@@ -167,92 +166,19 @@ __launch_bounds__(BLOCK_SIZE) __global__
         const auto colrow = a_col[i];
         for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
             const auto key = b_col[k];
-            auto hash = utils::modpow2(key * HASH_SCALE, TABLE_SIZE);
+            auto hash = key * HASH_SCALE;
+            if constexpr (utils::ispow2(TABLE_SIZE))
+                hash = utils::modpow2(hash, TABLE_SIZE);
+            else
+                hash = hash % TABLE_SIZE;
             while (true) {
                 const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
                 if (old == HASH_EMPTY || old == key)
                     break;
-                hash = utils::modpow2(hash + 1, TABLE_SIZE);
-            }
-        }
-    }
-    block.sync();
-
-    // Prepare cols for sorting
-    std::int32_t l_cols[ITEMS_PER_THREAD];
-    for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
-        l_cols[utils::divpow2(i, BLOCK_SIZE)] = s_table[i];
-    block.sync();
-
-    // Sort using merge sort
-    auto* l_ucols = reinterpret_cast<std::uint32_t(*)[ITEMS_PER_THREAD]>(&l_cols);
-    auto* sort_storage = reinterpret_cast<SortTempStorageT*>(smem);
-    SortT(*sort_storage).Sort(*l_ucols, cuda::std::less<std::uint32_t>{});
-    block.sync();
-
-    // Write to C.col
-    const auto c_offset = c_rpt[row];
-    const auto nnz = c_rpt[row + 1] - c_offset;
-    auto* store_storage = reinterpret_cast<StoreTempStorageT*>(smem);
-    StoreT(*store_storage).Store(&c_col[c_offset], l_cols, nnz);
-}
-
-template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
-__launch_bounds__(BLOCK_SIZE) __global__
-    void k_sym2_smem_max(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
-                         const __grid_constant__ std::int32_t* const __restrict__ a_col,
-                         const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
-                         const __grid_constant__ std::int32_t* const __restrict__ b_col,
-                         const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
-                         const __grid_constant__ std::int32_t* const __restrict__ bins,
-                         __grid_constant__ std::int32_t* const __restrict__ c_col) {
-    static constexpr auto ITEMS_PER_THREAD = TABLE_SIZE / BLOCK_SIZE;
-
-    using SortT = cub::BlockMergeSort<std::uint32_t, BLOCK_SIZE, ITEMS_PER_THREAD>;
-    using SortTempStorageT = typename SortT::TempStorage;
-    using StoreT = cub::BlockStore<std::int32_t,
-                                   BLOCK_SIZE,
-                                   ITEMS_PER_THREAD,
-                                   cub::BLOCK_STORE_WARP_TRANSPOSE>;
-    using StoreTempStorageT = typename StoreT::TempStorage;
-
-    static_assert(utils::ispow2(BLOCK_SIZE));
-    static_assert(TABLE_SIZE % BLOCK_SIZE == 0);
-#ifndef NDEBUG
-    static constexpr auto SMEM = cuda::std::max({TABLE_SIZE * sizeof(std::int32_t),
-                                                 sizeof(SortTempStorageT),
-                                                 sizeof(StoreTempStorageT)});
-    assert(dynamic_smem_size() == SMEM);
-#endif
-
-    extern __shared__ cuda::std::byte smem[];
-
-    const auto grid = cg::this_grid();
-    const auto block = cg::this_thread_block();
-    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
-
-    auto* s_table = reinterpret_cast<std::int32_t*>(smem);
-    for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
-        s_table[i] = HASH_EMPTY;
-    block.sync();
-
-    // Aggregate column indices in hash table
-    const auto row = bins[grid.block_rank()];
-    assert(c_rpt[row + 1] - c_rpt[row] <= TABLE_SIZE);
-    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
-    const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
-    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
-    const auto k_step = WARP_SIZE;
-    for (auto i = a_rpt[row] + i_offset; i < a_rpt[row + 1]; i += i_step) {
-        const auto colrow = a_col[i];
-        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt[colrow + 1]; k += k_step) {
-            const auto key = b_col[k];
-            auto hash = (key * HASH_SCALE) % TABLE_SIZE;
-            while (true) {
-                const auto old = atomicCAS_block(s_table + hash, HASH_EMPTY, key);
-                if (old == HASH_EMPTY || old == key)
-                    break;
-                hash = hash + 1 < TABLE_SIZE ? hash + 1 : 0;
+                if constexpr (utils::ispow2(TABLE_SIZE))
+                    hash = utils::modpow2(hash + 1, TABLE_SIZE);
+                else
+                    hash = hash + 1 < TABLE_SIZE ? hash + 1 : 0;
             }
         }
     }
@@ -389,36 +315,8 @@ void sym2(const utils::DeviceCSR<T>& A,
                              C.col);
     }
 
-    // Handle max smem bin
-    const auto max_smem_bin_size = meta.h_bin_sizes[Params::SYM2_MAX_SMEM_BIN];
-    SPDLOG_DEBUG("SYM2 bin {} size is {}", Params::SYM2_MAX_SMEM_BIN, max_smem_bin_size);
-    if (max_smem_bin_size > 0) {
-        static constexpr auto BLOCK_SIZE =
-            Params::SYM2_BLOCK_SIZES[Params::SYM2_MAX_SMEM_BIN];
-        static constexpr auto TABLE_SIZE =
-            Params::SYM2_TABLE_SIZES[Params::SYM2_MAX_SMEM_BIN];
-        static constexpr auto SMEM = Params::SYM2_SMEM_SIZES[Params::SYM2_MAX_SMEM_BIN];
-
-        utils::handle_cuda_error(
-            cudaFuncSetAttribute(k_sym2_smem_max<BLOCK_SIZE, TABLE_SIZE>,
-                                 cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                 SMEM));
-        utils::launch_kernel(k_sym2_smem_max<BLOCK_SIZE, TABLE_SIZE>,
-                             max_smem_bin_size,
-                             BLOCK_SIZE,
-                             SMEM,
-                             meta.streams[Params::SYM2_MAX_SMEM_BIN],
-                             A.rpt,
-                             A.col,
-                             B.rpt,
-                             B.col,
-                             C.rpt,
-                             meta.d_bins + meta.h_bin_offsets[Params::SYM2_MAX_SMEM_BIN],
-                             C.col);
-    }
-
     // Handle regular bins
-    constexpr_for<Params::SYM2_MAX_SMEM_BIN - 1, -1, -1>(
+    constexpr_for<Params::SYM2_GLOBAL_MEM_BIN - 1, -1, -1>(
         [&]<std::int32_t I>(std::integral_constant<std::int32_t, I> ARG) {
             static constexpr auto BIN = ARG.value;
             SPDLOG_DEBUG("SYM2 bin {} size is {}", BIN, meta.h_bin_sizes[BIN]);

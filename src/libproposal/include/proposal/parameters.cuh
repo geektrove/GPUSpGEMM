@@ -68,7 +68,6 @@ struct Parameters<CC86> {
     static constexpr auto SYM2_N_BINS = gsl::narrow_cast<std::int32_t>(
         SYM2_BLOCK_SIZES.size());
     static constexpr auto SYM2_GLOBAL_MEM_BIN = SYM2_N_BINS - 1;
-    static constexpr auto SYM2_MAX_SMEM_BIN = SYM2_N_BINS - 2;
 
     //
     // Numeric
