@@ -101,8 +101,6 @@ auto main(int argc, char** argv) -> int {
             fmt::println("Validation succeeded");
         } else {
             fmt::println("Validation failed");
-            fmt::println("Matrix A: {} x {}", h_a.m, h_a.n);
-            fmt::println("Matrix B: {} x {}", h_b.m, h_b.n);
             fmt::println("Matrix C: {} x {}", h_c.m, h_c.n);
             fmt::println("Matrix C (cuSPARSE): {} x {}", h_c_cusparse.m, h_c_cusparse.n);
             fmt::println("Non-zero elements in C: {}", h_c.nnz);
