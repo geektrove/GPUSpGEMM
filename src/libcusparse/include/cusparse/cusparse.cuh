@@ -1,5 +1,6 @@
 #include <concepts>
 #include <cstdlib>
+#include <type_traits>
 
 #include <cusparse.h>
 #include <gsl/gsl-lite.hpp>
@@ -10,6 +11,10 @@
 template<std::floating_point T>
 auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
     -> utils::DeviceCSR<T> {
+    static constexpr auto DATA_TYPE = std::is_same_v<T, float> ? CUDA_R_32F : CUDA_R_64F;
+    static constexpr T ALPHA = 1.0;
+    static constexpr T BETA = 0.0;
+
     // Create cuSPARSE matrix descriptors
     cusparseSpMatDescr_t desc_a{};
     utils::handle_cusparse_error(cusparseCreateCsr(&desc_a,
@@ -22,7 +27,7 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_BASE_ZERO,
-                                                   CUDA_R_64F));
+                                                   DATA_TYPE));
     cusparseSpMatDescr_t desc_b{};
     utils::handle_cusparse_error(cusparseCreateCsr(&desc_b,
                                                    b.m,
@@ -34,7 +39,7 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_BASE_ZERO,
-                                                   CUDA_R_64F));
+                                                   DATA_TYPE));
     cusparseSpMatDescr_t desc_c{};
     utils::handle_cusparse_error(cusparseCreateCsr(&desc_c,
                                                    a.m,
@@ -46,11 +51,7 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_32I,
                                                    CUSPARSE_INDEX_BASE_ZERO,
-                                                   CUDA_R_64F));
-
-    // Set parameters for the algorithm
-    const double alpha = 1.0;
-    const double beta = 0.0;
+                                                   DATA_TYPE));
 
     // Initialize cuSPARSE
     cusparseHandle_t handle{};
@@ -66,12 +67,12 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
         cusparseSpGEMM_workEstimation(handle,
                                       CUSPARSE_OPERATION_NON_TRANSPOSE,
                                       CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                      &alpha,
+                                      &ALPHA,
                                       desc_a,
                                       desc_b,
-                                      &beta,
+                                      &BETA,
                                       desc_c,
-                                      CUDA_R_64F,
+                                      DATA_TYPE,
                                       CUSPARSE_SPGEMM_DEFAULT,
                                       spgemm_desc,
                                       &buffer1_size,
@@ -82,12 +83,12 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
         cusparseSpGEMM_workEstimation(handle,
                                       CUSPARSE_OPERATION_NON_TRANSPOSE,
                                       CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                      &alpha,
+                                      &ALPHA,
                                       desc_a,
                                       desc_b,
-                                      &beta,
+                                      &BETA,
                                       desc_c,
-                                      CUDA_R_64F,
+                                      DATA_TYPE,
                                       CUSPARSE_SPGEMM_DEFAULT,
                                       spgemm_desc,
                                       &buffer1_size,
@@ -98,12 +99,12 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
     utils::handle_cusparse_error(cusparseSpGEMM_compute(handle,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        &alpha,
+                                                        &ALPHA,
                                                         desc_a,
                                                         desc_b,
-                                                        &beta,
+                                                        &BETA,
                                                         desc_c,
-                                                        CUDA_R_64F,
+                                                        DATA_TYPE,
                                                         CUSPARSE_SPGEMM_DEFAULT,
                                                         spgemm_desc,
                                                         &buffer2_size,
@@ -113,12 +114,12 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
     utils::handle_cusparse_error(cusparseSpGEMM_compute(handle,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                         CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        &alpha,
+                                                        &ALPHA,
                                                         desc_a,
                                                         desc_b,
-                                                        &beta,
+                                                        &BETA,
                                                         desc_c,
-                                                        CUDA_R_64F,
+                                                        DATA_TYPE,
                                                         CUSPARSE_SPGEMM_DEFAULT,
                                                         spgemm_desc,
                                                         &buffer2_size,
@@ -141,12 +142,12 @@ auto cusparse(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
     utils::handle_cusparse_error(cusparseSpGEMM_copy(handle,
                                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
                                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                     &alpha,
+                                                     &ALPHA,
                                                      desc_a,
                                                      desc_b,
-                                                     &beta,
+                                                     &BETA,
                                                      desc_c,
-                                                     CUDA_R_64F,
+                                                     DATA_TYPE,
                                                      CUSPARSE_SPGEMM_DEFAULT,
                                                      spgemm_desc));
 
