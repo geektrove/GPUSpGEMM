@@ -53,8 +53,11 @@ __launch_bounds__(BLOCK_SIZE) __global__
 
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     if (row < m) {
-        const auto bin_idx = find_bin<RANGES>(get_value(row));
-        atomicAdd_block(s_bin_sizes + bin_idx, 1);
+        const auto value = get_value(row);
+        if (value > 0) {
+            const auto bin_idx = find_bin<RANGES>(value);
+            atomicAdd_block(s_bin_sizes + bin_idx, 1);
+        }
     }
     block.sync();
 
@@ -85,8 +88,9 @@ __launch_bounds__(BLOCK_SIZE) __global__
 
     const auto row = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     std::int32_t bin_idx = 0;
-    if (row < m) {
-        bin_idx = find_bin<RANGES>(get_value(row));
+    const auto value = row < m ? get_value(row) : 0;
+    if (row < m && value > 0) {
+        bin_idx = find_bin<RANGES>(value);
         atomicAdd_block(s_bin_sizes + bin_idx, 1);
     }
     block.sync();
@@ -98,7 +102,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
     block.sync();
 
-    if (row < m) {
+    if (row < m && value > 0) {
         const auto index = atomicAdd_block(s_bin_sizes + bin_idx, 1);
         bins[s_bin_offsets[bin_idx] + index] = row;
     }
