@@ -59,6 +59,10 @@ __launch_bounds__(BLOCK_SIZE) __global__
     static_assert(utils::ispow2(BLOCK_SIZE));
     static_assert(PWARP_SIZE <= WARP_SIZE);
     static_assert(TOTAL_ARRAY_SIZE % ROWS_PER_BLOCK == 0);
+#ifndef NDEBUG
+    static constexpr auto SMEM = TOTAL_ARRAY_SIZE * (sizeof(T) + sizeof(std::int32_t));
+    assert(dynamic_smem_size() == SMEM);
+#endif
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -116,6 +120,12 @@ __launch_bounds__(BLOCK_SIZE) __global__
                     const __grid_constant__ std::int32_t* const __restrict__ c_col,
                     const __grid_constant__ std::int32_t* const __restrict__ bins,
                     __grid_constant__ T* const __restrict__ c_val) {
+    static_assert(utils::ispow2(BLOCK_SIZE));
+#ifndef NDEBUG
+    static constexpr auto SMEM = ARRAY_SIZE * (sizeof(T) + sizeof(std::int32_t));
+    assert(dynamic_smem_size() == SMEM);
+#endif
+
     extern __shared__ cuda::std::byte smem[];
 
     const auto grid = cg::this_grid();
@@ -165,6 +175,8 @@ __launch_bounds__(BLOCK_SIZE) __global__
                       const __grid_constant__ std::int32_t* const __restrict__ c_col,
                       const __grid_constant__ std::int32_t* const __restrict__ bins,
                       __grid_constant__ T* const __restrict__ c_val) {
+    static_assert(utils::ispow2(BLOCK_SIZE));
+
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());

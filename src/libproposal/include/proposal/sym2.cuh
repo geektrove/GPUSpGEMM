@@ -55,9 +55,9 @@ __launch_bounds__(BLOCK_SIZE) __global__
     static_assert(utils::ispow2(TOTAL_TABLE_SIZE));
     static_assert(PWARP_SIZE <= WARP_SIZE);
     static_assert(TOTAL_TABLE_SIZE % ROWS_PER_BLOCK == 0);
-    if constexpr (utils::IS_DEBUG) {
-        assert(dynamic_smem_size() == SMEM);
-    }
+#ifndef NDEBUG
+    assert(dynamic_smem_size() == SMEM);
+#endif
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -138,12 +138,12 @@ __launch_bounds__(BLOCK_SIZE) __global__
     static_assert(utils::ispow2(BLOCK_SIZE));
     static_assert(utils::ispow2(TABLE_SIZE));
     static_assert(TABLE_SIZE % BLOCK_SIZE == 0);
-    if constexpr (utils::IS_DEBUG) {
-        static constexpr auto SMEM = cuda::std::max({TABLE_SIZE * sizeof(std::int32_t),
-                                                     sizeof(SortTempStorageT),
-                                                     sizeof(StoreTempStorageT)});
-        assert(dynamic_smem_size() == SMEM);
-    }
+#ifndef NDEBUG
+    static constexpr auto SMEM = cuda::std::max({TABLE_SIZE * sizeof(std::int32_t),
+                                                 sizeof(SortTempStorageT),
+                                                 sizeof(StoreTempStorageT)});
+    assert(dynamic_smem_size() == SMEM);
+#endif
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -206,10 +206,11 @@ __launch_bounds__(BLOCK_SIZE) __global__
                          const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
                          const __grid_constant__ std::int32_t* const __restrict__ bins,
                          __grid_constant__ std::int32_t* const __restrict__ c_col) {
-    if constexpr (utils::IS_DEBUG) {
-        static constexpr auto SMEM = TABLE_SIZE * sizeof(std::int32_t);
-        assert(dynamic_smem_size() == SMEM);
-    }
+    static_assert(utils::ispow2(BLOCK_SIZE));
+#ifndef NDEBUG
+    static constexpr auto SMEM = TABLE_SIZE * sizeof(std::int32_t);
+    assert(dynamic_smem_size() == SMEM);
+#endif
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -281,6 +282,8 @@ __launch_bounds__(BLOCK_SIZE) __global__
                        const __grid_constant__ std::int32_t table_size,
                        __grid_constant__ std::int32_t* const __restrict__ tables,
                        __grid_constant__ std::int32_t* const __restrict__ c_col) {
+    static_assert(utils::ispow2(BLOCK_SIZE));
+
     __shared__ std::int32_t s_offset;
 
     const auto grid = cg::this_grid();

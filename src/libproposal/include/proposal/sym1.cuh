@@ -41,6 +41,10 @@ __launch_bounds__(BLOCK_SIZE) __global__
     static_assert(utils::ispow2(TOTAL_TABLE_SIZE));
     static_assert(PWARP_SIZE <= WARP_SIZE);
     static_assert(TOTAL_TABLE_SIZE % ROWS_PER_BLOCK == 0);
+#ifndef NDEBUG
+    static constexpr auto SMEM = TOTAL_TABLE_SIZE * sizeof(std::int32_t);
+    assert(dynamic_smem_size() == SMEM);
+#endif
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -103,7 +107,11 @@ __launch_bounds__(BLOCK_SIZE) __global__
     static_assert(utils::ispow2(BLOCK_SIZE));
     static_assert(utils::ispow2(TABLE_SIZE));
     static_assert(TABLE_SIZE % BLOCK_SIZE == 0);
-    static_assert(sizeof(ReduceTempStorageT) <= TABLE_SIZE * sizeof(std::int32_t));
+#ifndef NDEBUG
+    static constexpr auto SMEM = cuda::std::max(
+        {TABLE_SIZE * sizeof(std::int32_t), sizeof(ReduceTempStorageT)});
+    assert(dynamic_smem_size() == SMEM);
+#endif
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -160,6 +168,12 @@ __launch_bounds__(BLOCK_SIZE) __global__ void k_sym1_smem_max(
     __grid_constant__ std::int32_t* const __restrict__ fail_bin_size) {
     static constexpr auto THRESHOLD = gsl::narrow_cast<std::int32_t>(TABLE_SIZE
                                                                      * SYM1_RANGE_RATIO);
+
+    static_assert(utils::ispow2(BLOCK_SIZE));
+#ifndef NDEBUG
+    static constexpr auto SMEM = (TABLE_SIZE + 1) * sizeof(std::int32_t);
+    assert(dynamic_smem_size() == SMEM);
+#endif
 
     extern __shared__ cuda::std::byte smem[];
 
@@ -225,6 +239,8 @@ __launch_bounds__(BLOCK_SIZE) __global__
                        __grid_constant__ std::int32_t* const __restrict__ nnzs) {
     using ReduceT = cub::
         BlockReduce<std::int32_t, BLOCK_SIZE, cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>;
+
+    static_assert(utils::ispow2(BLOCK_SIZE));
 
     __shared__ typename ReduceT::TempStorage s_storage;
 
