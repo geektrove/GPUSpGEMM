@@ -299,9 +299,6 @@ void sym1(const utils::DeviceCSR<T>& A,
           Meta<Params>& meta) {
     NVTX3_FUNC_RANGE();
 
-    static constexpr auto IdxByteSize = gsl::narrow_cast<std::int32_t>(
-        sizeof(std::int32_t));
-
     // Handle max smem bin first as it may fail to fit in shared memory
     const auto max_smem_bin_size = meta.h_bin_sizes[Params::SYM1_MAX_SMEM_BIN];
     std::int32_t h_fail_bin_size{};
@@ -309,8 +306,8 @@ void sym1(const utils::DeviceCSR<T>& A,
     std::int32_t* d_fail_bin_size{};
     SPDLOG_DEBUG("SYM1 bin {} size is {}", Params::SYM1_MAX_SMEM_BIN, max_smem_bin_size);
     if (max_smem_bin_size > 0) {
-        auto tmp_mem_size = (max_smem_bin_size + 1) * IdxByteSize;
-        if (tmp_mem_size <= gsl::narrow_cast<std::int32_t>(meta.cub_storage_size)) {
+        auto tmp_mem_size = (max_smem_bin_size + 1) * sizeof(std::int32_t);
+        if (tmp_mem_size <= meta.cub_storage_size) {
             SPDLOG_DEBUG("CUB storage is enough for fail bin: {} <= {}",
                          tmp_mem_size,
                          meta.cub_storage_size);
@@ -420,8 +417,7 @@ void sym1(const utils::DeviceCSR<T>& A,
                 Params::SYM1_BLOCK_SIZES[Params::SYM1_GLOBAL_MEM_BIN];
 
             const auto table_size = meta.h_max_row_nnz;
-            meta.mem_pool_size = gsl::narrow_cast<std::size_t>(
-                h_fail_bin_size * table_size * IdxByteSize);
+            meta.mem_pool_size = h_fail_bin_size * table_size * sizeof(std::int32_t);
             meta.d_mem_pool = utils::malloc_async(
                 meta.mem_pool_size,
                 meta.streams[Params::SYM1_GLOBAL_MEM_BIN]);
