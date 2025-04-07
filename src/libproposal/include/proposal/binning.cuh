@@ -114,12 +114,9 @@ void small_binning(const std::int32_t m, Meta<Params>& meta) {
 
     // Perform iota operation to fill the smallest bin with row indices
     utils::handle_cuda_error(
-        cub::DeviceFor::Bulk(meta.d_cub_storage,
-                             meta.cub_storage_size,
-                             m,
-                             [bins = meta.d_bins] __device__(int i) {
-                                 bins[i] = gsl::narrow_cast<std::int32_t>(i);
-                             }));
+        cub::DeviceFor::Bulk(m, [bins = meta.d_bins] __device__(std::int32_t i) {
+            bins[i] = i;
+        }));
 
     // Set bin sizes and offsets
     meta.h_bin_sizes[0] = m;

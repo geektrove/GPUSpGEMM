@@ -94,14 +94,12 @@ template<typename Params>
 void allocate_device_mem(const std::int32_t m, Meta<Params>& meta) {
     // Estimate CUB storage size
     size_t cub_requested{};
-    cub::DeviceFor::Bulk(nullptr, cub_requested, m, [] __device__(int) {});
-    meta.cub_storage_size = cub_requested;
     cub::DeviceReduce::Max(nullptr,
                            cub_requested,
                            static_cast<std::int32_t*>(nullptr),
                            static_cast<std::int32_t*>(nullptr),
                            m);
-    meta.cub_storage_size = std::max(meta.cub_storage_size, cub_requested);
+    meta.cub_storage_size = cub_requested;
     cub::DeviceScan::ExclusiveSum(nullptr,
                                   cub_requested,
                                   static_cast<std::int32_t*>(nullptr),
