@@ -215,7 +215,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
                        const __grid_constant__ std::int32_t* const __restrict__ b_col,
                        const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
                        const __grid_constant__ std::int32_t* const __restrict__ bins,
-                       const __grid_constant__ std::int32_t table_size,
+                       const __grid_constant__ std::int32_t common_table_size,
                        __grid_constant__ std::int32_t* const __restrict__ tables,
                        __grid_constant__ std::int32_t* const __restrict__ c_col) {
     static_assert(utils::ispow2(BLOCK_SIZE));
@@ -225,16 +225,21 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+    const auto big = gsl::narrow_cast<std::int32_t>(grid.block_rank());
 
-    auto* table = tables + (static_cast<ptrdiff_t>(grid.block_rank()) * table_size);
+    const auto row = bins[big];
+    const auto c_offset = c_rpt[row];
+    const auto nnz = c_rpt[row + 1] - c_offset;
+
+    auto* table = tables + static_cast<ptrdiff_t>(big * common_table_size);
+    const auto table_size = gsl::narrow_cast<std::int32_t>(nnz / SYM2_RANGE_RATIO);
+    assert(table_size <= common_table_size);
     for (auto i = tib; i < table_size; i += BLOCK_SIZE)
         table[i] = HASH_EMPTY;
     cg::invoke_one(block, [&] { s_offset = 0; });
     block.sync();
 
     // Aggregate column indices in hash table
-    const auto row = bins[grid.block_rank()];
-    assert(c_rpt[row + 1] - c_rpt[row] <= table_size);
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
@@ -267,8 +272,6 @@ __launch_bounds__(BLOCK_SIZE) __global__
     block.sync();
 
     // Write to C.col
-    const auto c_offset = c_rpt[row];
-    const auto nnz = c_rpt[row + 1] - c_offset;
     for (auto i = tib; i < nnz; i += BLOCK_SIZE) {
         const auto col = table[i];
         std::int32_t n_less = 0;
@@ -288,24 +291,30 @@ void sym2(const utils::DeviceCSR<T>& A,
     NVTX3_FUNC_RANGE();
 
     // Handle global memory bin
-    const auto global_mem_bin_size = meta.h_bin_sizes[Params::SYM2_GLOBAL_MEM_BIN];
+    const auto gmem_bin_size = meta.h_bin_sizes[Params::SYM2_GLOBAL_MEM_BIN];
     SPDLOG_DEBUG("SYM2 bin {} size is {}",
                  Params::SYM2_GLOBAL_MEM_BIN,
                  meta.h_bin_sizes[Params::SYM2_GLOBAL_MEM_BIN]);
-    if (global_mem_bin_size > 0) {
+    const auto gmem_table_size = gsl::narrow_cast<std::int32_t>(meta.h_max_row_nnz
+                                                                / SYM2_RANGE_RATIO);
+    if (gmem_bin_size > 0) {
         static constexpr auto BLOCK_SIZE =
             Params::SYM2_BLOCK_SIZES[Params::SYM2_GLOBAL_MEM_BIN];
 
-        // Because mem pool is allocated for fail bin during SYM1 phase based on NIP,
-        // there is always enough space for SYM2 global memory bin.
-        const auto available_table_size = gsl::narrow_cast<std::int32_t>(
-            meta.mem_pool_size / (sizeof(std::int32_t) * global_mem_bin_size));
-        const auto desirable_table_size = gsl::narrow_cast<std::int32_t>(
-            meta.h_max_row_nnz / SYM2_RANGE_RATIO);
-        const auto table_size = std::min(desirable_table_size, available_table_size);
+        const auto gmem_size = gmem_bin_size * gmem_table_size * sizeof(std::int32_t);
+        if (meta.mem_pool_size < gmem_size) {
+            SPDLOG_DEBUG("Memory pool size {} is less than required {}",
+                         meta.mem_pool_size,
+                         gmem_size);
+            utils::free_async(meta.d_mem_pool, meta.streams[Params::SYM2_GLOBAL_MEM_BIN]);
+            meta.mem_pool_size = gmem_size;
+            meta.d_mem_pool = utils::malloc_async(
+                meta.mem_pool_size,
+                meta.streams[Params::SYM2_GLOBAL_MEM_BIN]);
+        }
 
         utils::launch_kernel(k_sym2_global<BLOCK_SIZE>,
-                             global_mem_bin_size,
+                             gmem_bin_size,
                              BLOCK_SIZE,
                              0,
                              meta.streams[Params::SYM2_GLOBAL_MEM_BIN],
@@ -316,7 +325,7 @@ void sym2(const utils::DeviceCSR<T>& A,
                              C.rpt,
                              meta.d_bins
                                  + meta.h_bin_offsets[Params::SYM2_GLOBAL_MEM_BIN],
-                             table_size,
+                             gmem_table_size,
                              static_cast<std::int32_t*>(meta.d_mem_pool),
                              C.col);
     }
