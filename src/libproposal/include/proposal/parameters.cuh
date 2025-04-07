@@ -95,13 +95,13 @@ struct Parameters<CC86> {
     static constexpr cuda::std::array NUM_BLOCK_SIZES = {512, 128, 256, 512, 1024, 1024};
     static constexpr cuda::std::array NUM_PWARP_SIZES = {8, 0, 0, 0, 0, 0};
     static constexpr cuda::std::array NUM_ARRAY_SIZES_F32 =
-        {4096, 938, 2005, 4138, 12672, 0};
+        {4096, 938, 2004, 4138, 12672, 0};
     static constexpr cuda::std::array NUM_SMEM_SIZES_F32 =
-        {32768, 7504, 16040, 33104, 101'376, 0};
+        {32768, 7504, 16032, 33104, 101'376, 0};
     static constexpr cuda::std::array NUM_ARRAY_SIZES_F64 =
-        {2752, 625, 1336, 2759, 8448, 0};
+        {2688, 624, 1336, 2758, 8448, 0};
     static constexpr cuda::std::array NUM_SMEM_SIZES_F64 =
-        {33024, 7500, 16032, 33108, 101'376, 0};
+        {32256, 7488, 16032, 33096, 101'376, 0};
 
     static_assert(NUM_BLOCK_SIZES.size() == NUM_PWARP_SIZES.size());
     static_assert(NUM_BLOCK_SIZES.size() == NUM_ARRAY_SIZES_F32.size());
