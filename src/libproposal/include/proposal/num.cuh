@@ -219,16 +219,16 @@ void num(const utils::DeviceCSR<T>& A,
     NVTX3_FUNC_RANGE();
 
     // Handle global memory bin
-    const auto global_mem_bin_size = meta.h_bin_sizes[Params::NUM_GLOBAL_MEM_BIN];
+    const auto gmem_bin_size = meta.h_bin_sizes[Params::NUM_GLOBAL_MEM_BIN];
     SPDLOG_DEBUG("NUM bin {} size is {}",
                  Params::NUM_GLOBAL_MEM_BIN,
                  meta.h_bin_sizes[Params::NUM_GLOBAL_MEM_BIN]);
-    if (global_mem_bin_size > 0) {
+    if (gmem_bin_size > 0) {
         static constexpr auto BLOCK_SIZE =
             Params::NUM_BLOCK_SIZES[Params::NUM_GLOBAL_MEM_BIN];
 
         utils::launch_kernel(k_num_global<T, BLOCK_SIZE>,
-                             global_mem_bin_size,
+                             gmem_bin_size,
                              BLOCK_SIZE,
                              0,
                              meta.streams[Params::NUM_GLOBAL_MEM_BIN],
