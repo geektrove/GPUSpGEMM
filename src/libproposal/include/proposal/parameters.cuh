@@ -138,8 +138,6 @@ struct Parameters<CC86> {
 
     static constexpr std::int32_t MAX_N_BINS = std::max(
         {SYM1_N_BINS, SYM2_N_BINS, NUM_N_BINS});
-
-    static constexpr std::int32_t MAX_THREADS_PER_SM = 1536;
     static constexpr std::int32_t OPTIMAL_BLOCK_SIZE = 512;
 };
 
