@@ -158,7 +158,7 @@ requires(L == Location::Host)
         throw std::runtime_error("Failed to open file " + filename);
 
     auto write = [&ofs](const auto* data, std::int32_t size = 1) {
-        const auto bytes = gsl::narrow_cast<std::int32_t>(sizeof(*data)) * size;
+        const auto bytes = sizeof(*data) * size;
         ofs.write(reinterpret_cast<const char*>(data), bytes);
         if (ofs.fail())
             throw std::runtime_error("Failed to write to file");
