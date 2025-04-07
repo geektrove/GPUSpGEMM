@@ -45,8 +45,12 @@ URLS = [f"{BASE_URL}/{name}.mat" for name in MATRICES]
 logger = logging.getLogger(__name__)
 
 
-def download_matrix(url: str, output_dir: Path) -> None:
+def download_matrix(url: str, output_dir: Path, force: bool) -> None:
     mat_name = Path(url).stem
+    csr_filename = output_dir / f"{mat_name}.csr"
+    if not force and csr_filename.exists():
+        logger.info(f"CSR file {csr_filename} already exists, skipping download")
+        return
 
     mat_filename, _ = urlretrieve(url)
     logger.info(f"Downloaded {url} to {mat_filename}")
@@ -58,7 +62,6 @@ def download_matrix(url: str, output_dir: Path) -> None:
         csr += zeros
     logger.info(f"Converted {mat_name} to CSR format")
 
-    csr_filename = output_dir / f"{mat_name}.csr"
     with csr_filename.open("wb") as fp:
         header = np.array([csr.nnz, csr.shape[0], csr.shape[1]], dtype=np.int32)
         header.tofile(fp)
@@ -87,13 +90,21 @@ def main():
         default=multiprocessing.cpu_count() * 2,
         help="Number of threads to use for downloading",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+    )
     args = parser.parse_args()
-    output_dir: Path = args.output_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
-    threads: int = args.threads
 
+    output_dir: Path = args.output_dir
+    threads: int = args.threads
+    force: bool = args.force
+
+    output_dir.mkdir(parents=True, exist_ok=True)
     with ThreadPoolExecutor(max_workers=threads) as executor:
-        futures = [executor.submit(download_matrix, url, output_dir) for url in URLS]
+        futures = [
+            executor.submit(download_matrix, url, output_dir, force) for url in URLS
+        ]
         for future in futures:
             try:
                 future.result()
