@@ -40,6 +40,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     static_assert(utils::ispow2(BLOCK_SIZE));
     static_assert(utils::ispow2(TOTAL_TABLE_SIZE));
     static_assert(PWARP_SIZE <= WARP_SIZE);
+    static_assert(BLOCK_SIZE % PWARP_SIZE == 0);
     static_assert(TOTAL_TABLE_SIZE % ROWS_PER_BLOCK == 0);
 #ifndef NDEBUG
     static constexpr auto SMEM = TOTAL_TABLE_SIZE * sizeof(std::int32_t);
