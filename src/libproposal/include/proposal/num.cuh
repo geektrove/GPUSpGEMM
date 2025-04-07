@@ -168,6 +168,58 @@ __launch_bounds__(BLOCK_SIZE) __global__
     cg::wait(block);
 }
 
+template<std::floating_point T, std::int32_t BLOCK_SIZE, std::int32_t ARRAY_SIZE>
+__launch_bounds__(BLOCK_SIZE) __global__
+    void k_num_smem_cols(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                         const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                         const __grid_constant__ T* const __restrict__ a_val,
+                         const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                         const __grid_constant__ std::int32_t* const __restrict__ b_col,
+                         const __grid_constant__ T* const __restrict__ b_val,
+                         const __grid_constant__ std::int32_t* const __restrict__ c_rpt,
+                         const __grid_constant__ std::int32_t* const __restrict__ c_col,
+                         const __grid_constant__ std::int32_t* const __restrict__ bins,
+                         __grid_constant__ T* const __restrict__ c_val) {
+#ifndef NDEBUG
+    static constexpr auto SMEM = ARRAY_SIZE * sizeof(std::int32_t);
+    assert(dynamic_smem_size() == SMEM);
+#endif
+
+    extern __shared__ cuda::std::byte smem[];
+
+    const auto grid = cg::this_grid();
+    const auto block = cg::this_thread_block();
+    const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
+
+    auto* s_cols = reinterpret_cast<std::int32_t*>(smem);
+
+    const auto row = bins[grid.block_rank()];
+    const auto c_offset = c_rpt[row];
+    const auto size = c_rpt[row + 1] - c_offset;
+    auto* vals = c_val + c_offset;
+
+    cg::memcpy_async(block, s_cols, c_col + c_offset, size * sizeof(*s_cols));
+    for (auto i = tib; i < size; i += BLOCK_SIZE)
+        vals[i] = 0;
+    cg::wait(block);
+    block.sync();
+
+    const auto i_offset = utils::divpow2(tib, WARP_SIZE);
+    const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
+    const auto k_offset = utils::modpow2(tib, WARP_SIZE);
+    const auto k_step = WARP_SIZE;
+    const auto a_rpt_end = a_rpt[row + 1];
+    for (auto i = a_rpt[row] + i_offset; i < a_rpt_end; i += i_step) {
+        const auto a_value = a_val[i];
+        const auto colrow = a_col[i];
+        const auto b_rpt_end = b_rpt[colrow + 1];
+        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt_end; k += k_step) {
+            const auto idx = find_key(s_cols, size, b_col[k]);
+            atomicAdd_block(vals + idx, a_value * b_val[k]);
+        }
+    }
+}
+
 template<std::floating_point T, std::int32_t BLOCK_SIZE>
 __launch_bounds__(BLOCK_SIZE) __global__
     void k_num_global(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
@@ -244,8 +296,46 @@ void num(const utils::DeviceCSR<T>& A,
                              C.val);
     }
 
+    // Handle smem column bins
+    constexpr_for<Params::NUM_SMEM_COLS_BIN_BEGIN,
+                  Params::NUM_SMEM_REGULAR_BIN_BEGIN,
+                  -1>([&]<std::int32_t I>(std::integral_constant<std::int32_t, I> ARG) {
+        static constexpr auto BIN = ARG.value;
+        SPDLOG_DEBUG("NUM bin {} size is {}", BIN, meta.h_bin_sizes[BIN]);
+        if (meta.h_bin_sizes[BIN] == 0)
+            return;
+
+        static constexpr auto BLOCK_SIZE = Params::NUM_BLOCK_SIZES[BIN];
+        static constexpr auto ARRAY_SIZE = std::is_same_v<T, float>
+                                               ? Params::NUM_ARRAY_SIZES_F32[BIN]
+                                               : Params::NUM_ARRAY_SIZES_F64[BIN];
+        static constexpr auto SMEM = std::is_same_v<T, float>
+                                         ? Params::NUM_SMEM_SIZES_F32[BIN]
+                                         : Params::NUM_SMEM_SIZES_F64[BIN];
+
+        utils::handle_cuda_error(
+            cudaFuncSetAttribute(k_num_smem_cols<T, BLOCK_SIZE, ARRAY_SIZE>,
+                                 cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                 SMEM));
+        utils::launch_kernel(k_num_smem_cols<T, BLOCK_SIZE, ARRAY_SIZE>,
+                             meta.h_bin_sizes[BIN],
+                             BLOCK_SIZE,
+                             SMEM,
+                             meta.streams[BIN],
+                             A.rpt,
+                             A.col,
+                             A.val,
+                             B.rpt,
+                             B.col,
+                             B.val,
+                             C.rpt,
+                             C.col,
+                             meta.d_bins + meta.h_bin_offsets[BIN],
+                             C.val);
+    });
+
     // Handle regular bins
-    constexpr_for<Params::NUM_GLOBAL_MEM_BIN - 1, -1, -1>(
+    constexpr_for<Params::NUM_SMEM_REGULAR_BIN_BEGIN - 1, -1, -1>(
         [&]<std::int32_t I>(std::integral_constant<std::int32_t, I> ARG) {
             static constexpr auto BIN = ARG.value;
             SPDLOG_DEBUG("NUM bin {} size is {}", BIN, meta.h_bin_sizes[BIN]);

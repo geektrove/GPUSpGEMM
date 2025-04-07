@@ -92,43 +92,46 @@ struct Parameters<CC86> {
     // Numeric
     //
 
-    static constexpr cuda::std::array NUM_BLOCK_SIZES = {512, 128, 256, 512, 1024, 1024};
-    static constexpr cuda::std::array NUM_PWARP_SIZES = {8, 0, 0, 0, 0, 0};
+    static constexpr cuda::std::array NUM_BLOCK_SIZES =
+        {512, 128, 256, 512, 1024, 768, 1024, 1024};
+    static constexpr cuda::std::array NUM_PWARP_SIZES = {8, 0, 0, 0, 0, 0, 0, 0};
     static constexpr cuda::std::array NUM_ARRAY_SIZES_F32 =
-        {4096, 938, 2004, 4138, 12672, 0};
+        {4096, 938, 2004, 4138, 12672, 12544, 25344, 0};
     static constexpr cuda::std::array NUM_SMEM_SIZES_F32 =
-        {32768, 7504, 16032, 33104, 101'376, 0};
+        {32768, 7504, 16032, 33104, 101'376, 50176, 101'376, 0};
     static constexpr cuda::std::array NUM_ARRAY_SIZES_F64 =
-        {2688, 624, 1336, 2758, 8448, 0};
+        {2688, 624, 1336, 2758, 8448, 12544, 25344, 0};
     static constexpr cuda::std::array NUM_SMEM_SIZES_F64 =
-        {32256, 7488, 16032, 33096, 101'376, 0};
+        {32256, 7488, 16032, 33096, 101'376, 50176, 101'376, 0};
 
     static_assert(NUM_BLOCK_SIZES.size() == NUM_PWARP_SIZES.size());
     static_assert(NUM_BLOCK_SIZES.size() == NUM_ARRAY_SIZES_F32.size());
+    static_assert(NUM_BLOCK_SIZES.size() == NUM_SMEM_SIZES_F32.size());
     static_assert(NUM_BLOCK_SIZES.size() == NUM_ARRAY_SIZES_F64.size());
+    static_assert(NUM_BLOCK_SIZES.size() == NUM_SMEM_SIZES_F64.size());
 
     static constexpr auto NUM_N_BINS = gsl::narrow_cast<std::int32_t>(
         NUM_BLOCK_SIZES.size());
     static constexpr auto NUM_GLOBAL_MEM_BIN = NUM_N_BINS - 1;
+    static constexpr auto NUM_SMEM_COLS_BIN_BEGIN = NUM_N_BINS - 2;
+    static constexpr auto NUM_SMEM_REGULAR_BIN_BEGIN = NUM_N_BINS - 4;
 
     static constexpr cuda::std::array NUM_RANGES_F32 = std::invoke([] {
-        cuda::std::array<int, NUM_N_BINS> ranges{};
-        for (auto i = 0; i < NUM_GLOBAL_MEM_BIN; i++) {
-            ranges[i] = NUM_ARRAY_SIZES_F32[i];
+        cuda::std::array ranges = NUM_ARRAY_SIZES_F32;
+        ranges[NUM_GLOBAL_MEM_BIN] = INT32_MAX;
+        for (auto i = NUM_SMEM_REGULAR_BIN_BEGIN; i >= 0; i--) {
             if (NUM_PWARP_SIZES[i] > 0)
                 ranges[i] /= (NUM_BLOCK_SIZES[i] / NUM_PWARP_SIZES[i]);
         }
-        ranges[NUM_GLOBAL_MEM_BIN] = INT32_MAX;
         return ranges;
     });
     static constexpr cuda::std::array NUM_RANGES_F64 = std::invoke([] {
-        cuda::std::array<int, NUM_N_BINS> ranges{};
-        for (auto i = 0; i < NUM_GLOBAL_MEM_BIN; i++) {
-            ranges[i] = NUM_ARRAY_SIZES_F64[i];
+        cuda::std::array ranges = NUM_ARRAY_SIZES_F64;
+        ranges[NUM_GLOBAL_MEM_BIN] = INT32_MAX;
+        for (auto i = NUM_SMEM_REGULAR_BIN_BEGIN; i >= 0; i--) {
             if (NUM_PWARP_SIZES[i] > 0)
                 ranges[i] /= (NUM_BLOCK_SIZES[i] / NUM_PWARP_SIZES[i]);
         }
-        ranges[NUM_GLOBAL_MEM_BIN] = INT32_MAX;
         return ranges;
     });
 
