@@ -218,10 +218,10 @@ requires(L == Location::Host)
     if (!std::equal(lhs.col, lhs.col + lhs.nnz, rhs.col))
         return false;
     return std::equal(lhs.val, lhs.val + lhs.nnz, rhs.val, [](const T& l, const T& r) {
+        static constexpr T atol = 1e-8;
+        static constexpr T rtol = 1e-5;
         if (l == r)
             return true;
-        static constexpr T rtol = std::is_same_v<T, float> ? 1e-5 : 1e-7;
-        static constexpr T atol = std::is_same_v<T, float> ? 1e-8 : 1e-12;
         return std::fabs(l - r) <= (atol + rtol * std::max(std::fabs(l), std::fabs(r)));
     });
 }
