@@ -102,13 +102,15 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
         return (major * MAJOR_SHIFT) + (minor * MINOR_SHIFT);
     });
 
-    if (CC == CC80) {
+#if defined(COMPUTE_80)
+    if (CC == CC80)
         return proposal_inner<T, Parameters<CC80>>(A, B);
-    }
+#endif
 
-    if (CC == CC86) {
+#if defined(COMPUTE_86)
+    if (CC == CC86)
         return proposal_inner<T, Parameters<CC86>>(A, B);
-    }
+#endif
 
     throw std::runtime_error("Unsupported compute capability");
 }
