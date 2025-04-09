@@ -28,12 +28,12 @@ struct Parameters<CC80> {
     //
 
     static constexpr cuda::std::array SYM1_BLOCK_SIZES =
-        {512, 128, 256, 512, 1024, 1024, 1024};
-    static constexpr cuda::std::array SYM1_PWARP_SIZES = {4, 0, 0, 0, 0, 0, 0};
+        {1024, 64, 128, 256, 512, 1024, 1024, 1024, 1024};
+    static constexpr cuda::std::array SYM1_PWARP_SIZES = {4, 0, 0, 0, 0, 0, 0, 0, 0};
     static constexpr cuda::std::array SYM1_TABLE_SIZES =
-        {8192, 1024, 2048, 8192, 16384, 25343, 0};
+        {16384, 1024, 2048, 4096, 8192, 16384, 32768, 41727, 0};
     static constexpr cuda::std::array SYM1_SMEM_SIZES =
-        {32768, 4096, 8192, 32768, 65536, 101'376, 0};
+        {65536, 4096, 8192, 16384, 32768, 65536, 131'072, 166'912, 0};
 
     static_assert(SYM1_BLOCK_SIZES.size() == SYM1_PWARP_SIZES.size());
     static_assert(SYM1_BLOCK_SIZES.size() == SYM1_TABLE_SIZES.size());
@@ -62,12 +62,12 @@ struct Parameters<CC80> {
     //
 
     static constexpr cuda::std::array SYM2_BLOCK_SIZES =
-        {512, 512, 128, 256, 512, 1024, 1024, 1024};
-    static constexpr cuda::std::array SYM2_PWARP_SIZES = {4, 4, 0, 0, 0, 0, 0, 0};
+        {1024, 1024, 64, 128, 256, 512, 1024, 1024, 1024, 1024};
+    static constexpr cuda::std::array SYM2_PWARP_SIZES = {4, 4, 0, 0, 0, 0, 0, 0, 0, 0};
     static constexpr cuda::std::array SYM2_TABLE_SIZES =
-        {4096, 8192, 1024, 2048, 8192, 16384, 24576, 0};
+        {8192, 16384, 1024, 2048, 4096, 8192, 16384, 32768, 40960, 0};
     static constexpr cuda::std::array SYM2_SMEM_SIZES =
-        {17408, 34304, 4240, 8464, 33808, 67600, 98320, 0};
+        {34816, 68608, 4240, 8464, 16912, 33808, 67600, 135'184, 163'856, 0};
 
     static_assert(SYM2_BLOCK_SIZES.size() == SYM2_PWARP_SIZES.size());
     static_assert(SYM2_BLOCK_SIZES.size() == SYM2_TABLE_SIZES.size());
@@ -94,16 +94,16 @@ struct Parameters<CC80> {
     //
 
     static constexpr cuda::std::array NUM_BLOCK_SIZES =
-        {512, 128, 256, 512, 1024, 768, 1024, 1024};
-    static constexpr cuda::std::array NUM_PWARP_SIZES = {8, 0, 0, 0, 0, 0, 0, 0};
+        {1024, 64, 128, 256, 512, 1024, 1024, 1024, 1024, 1024};
+    static constexpr cuda::std::array NUM_PWARP_SIZES = {8, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     static constexpr cuda::std::array NUM_ARRAY_SIZES_F32 =
-        {4096, 938, 2004, 4138, 12672, 12544, 25344, 0};
+        {10240, 528, 1184, 2496, 5120, 10368, 20864, 20736, 41728, 0};
     static constexpr cuda::std::array NUM_SMEM_SIZES_F32 =
-        {32768, 7504, 16032, 33104, 101'376, 50176, 101'376, 0};
+        {81920, 4224, 9472, 19968, 40960, 82944, 166'912, 82944, 166'912, 0};
     static constexpr cuda::std::array NUM_ARRAY_SIZES_F64 =
-        {2688, 624, 1336, 2758, 8448, 12544, 25344, 0};
+        {6912, 352, 788, 1664, 3412, 6912, 13908, 20736, 41728, 0};
     static constexpr cuda::std::array NUM_SMEM_SIZES_F64 =
-        {32256, 7488, 16032, 33096, 101'376, 50176, 101'376, 0};
+        {82944, 4224, 9456, 19968, 40944, 82944, 166'896, 82944, 166'912, 0};
 
     static_assert(NUM_BLOCK_SIZES.size() == NUM_PWARP_SIZES.size());
     static_assert(NUM_BLOCK_SIZES.size() == NUM_ARRAY_SIZES_F32.size());
