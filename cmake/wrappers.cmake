@@ -27,6 +27,25 @@ function(_customize_target_wrapped name visibility)
             --expt-relaxed-constexpr --extended-lambda)
     endif()
 
+    if(NOT visibility STREQUAL "INTERFACE")
+        get_target_property(TARGET_ARCHS ${name} CUDA_ARCHITECTURES)
+        if(NOT TARGET_ARCHS STREQUAL "TARGET_ARCHS-NOTFOUND")
+            if(TARGET_ARCHS IN_LIST "all;all-major;native")
+                message(
+                    FATAL_ERROR
+                        "CUDA_ARCHITECTURES is set to 'all', 'all-major' or 'native' which is not supported"
+                )
+            endif()
+            set(COMPUTE_MACROS "")
+            foreach(arch IN LISTS TARGET_ARCHS)
+                string(REGEX REPLACE "-.*" "" stripped_arch "${arch}")
+                list(APPEND COMPUTE_MACROS "COMPUTE_${stripped_arch}")
+            endforeach()
+            list(REMOVE_DUPLICATES COMPUTE_MACROS)
+            target_compile_definitions(${name} ${visibility} ${COMPUTE_MACROS})
+        endif()
+    endif()
+
     target_compile_definitions(${name} ${visibility}
                                        CUDA_API_PER_THREAD_DEFAULT_STREAM)
     target_compile_definitions(
