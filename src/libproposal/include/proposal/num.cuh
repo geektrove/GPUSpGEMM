@@ -333,7 +333,7 @@ void num(const utils::DeviceCSR<T>& A,
     });
 
     // Handle regular bins
-    constexpr_for<Params::NUM_SMEM_REGULAR_BIN_BEGIN - 1, -1, -1>(
+    constexpr_for<Params::NUM_SMEM_REGULAR_BIN_BEGIN, -1, -1>(
         [&]<std::int32_t I>(std::integral_constant<std::int32_t, I> ARG) {
             static constexpr auto BIN = ARG.value;
             SPDLOG_DEBUG("NUM bin {} size is {}", BIN, meta.h_bin_sizes[BIN]);
