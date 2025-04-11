@@ -33,12 +33,15 @@ __forceinline__ __device__ auto find_bin(const std::int32_t x) -> std::int32_t {
     __builtin_unreachable();
 }
 
-template<std::int32_t BLOCK_SIZE, BinningType BinType, typename GetValueF>
+template<std::int32_t BLOCK_SIZE,
+         std::int32_t CC,
+         BinningType BinType,
+         typename GetValueF>
 __launch_bounds__(BLOCK_SIZE) __global__
     void k_binning1(const __grid_constant__ std::int32_t m,
                     __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
                     GetValueF get_value) {
-    static constexpr auto RANGES = get_ranges<BinType>();
+    static constexpr auto RANGES = get_ranges<CC, BinType>();
     static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
 
     __shared__ std::int32_t s_bin_sizes[N_BINS];
@@ -65,14 +68,17 @@ __launch_bounds__(BLOCK_SIZE) __global__
         atomicAdd(bin_sizes + tib, s_bin_sizes[tib]);
 }
 
-template<std::int32_t BLOCK_SIZE, BinningType BinType, typename GetValueF>
+template<std::int32_t BLOCK_SIZE,
+         std::int32_t CC,
+         BinningType BinType,
+         typename GetValueF>
 __launch_bounds__(BLOCK_SIZE) __global__
     void k_binning2(const __grid_constant__ std::int32_t m,
                     const __grid_constant__ std::int32_t* const __restrict__ bin_offsets,
                     __grid_constant__ std::int32_t* const __restrict__ bin_sizes,
                     __grid_constant__ std::int32_t* const __restrict__ bins,
                     GetValueF get_value) {
-    static constexpr auto RANGES = get_ranges<BinType>();
+    static constexpr auto RANGES = get_ranges<CC, BinType>();
     static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
 
     __shared__ std::int32_t s_bin_sizes[N_BINS];
@@ -133,7 +139,7 @@ template<std::floating_point T, typename Params, BinningType BinType, typename G
 void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     NVTX3_FUNC_RANGE();
 
-    static constexpr auto RANGES = get_ranges<Params, BinType>();
+    static constexpr auto RANGES = get_ranges<Params::CC, BinType>();
     static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
 
     if (meta.h_max_row_nnz <= RANGES[0]) {
@@ -145,14 +151,15 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
 
     // Perform full two-stage symbolic binning
     utils::memset_async(meta.d_bin_sizes, 0, N_BINS * sizeof(*meta.d_bin_sizes));
-    utils::launch_kernel(k_binning1<Params::OPTIMAL_BLOCK_SIZE, BinType, GetValueF>,
-                         cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
-                         Params::OPTIMAL_BLOCK_SIZE,
-                         0,
-                         cudaStreamDefault,
-                         C.m,
-                         meta.d_bin_sizes,
-                         get_value);
+    utils::launch_kernel(
+        k_binning1<Params::OPTIMAL_BLOCK_SIZE, Params::CC, BinType, GetValueF>,
+        cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
+        Params::OPTIMAL_BLOCK_SIZE,
+        0,
+        cudaStreamDefault,
+        C.m,
+        meta.d_bin_sizes,
+        get_value);
     utils::memcpy_async(meta.h_bin_sizes,
                         meta.d_bin_sizes,
                         N_BINS * sizeof(*meta.h_bin_sizes));
@@ -174,16 +181,17 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     utils::memcpy_async(meta.d_bin_offsets,
                         meta.h_bin_offsets,
                         N_BINS * sizeof(*meta.d_bin_offsets));
-    utils::launch_kernel(k_binning2<Params::OPTIMAL_BLOCK_SIZE, BinType, GetValueF>,
-                         cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
-                         Params::OPTIMAL_BLOCK_SIZE,
-                         0,
-                         cudaStreamDefault,
-                         C.m,
-                         meta.d_bin_offsets,
-                         meta.d_bin_sizes,
-                         meta.d_bins,
-                         get_value);
+    utils::launch_kernel(
+        k_binning2<Params::OPTIMAL_BLOCK_SIZE, Params::CC, BinType, GetValueF>,
+        cuda::ceil_div(C.m, Params::OPTIMAL_BLOCK_SIZE),
+        Params::OPTIMAL_BLOCK_SIZE,
+        0,
+        cudaStreamDefault,
+        C.m,
+        meta.d_bin_offsets,
+        meta.d_bin_sizes,
+        meta.d_bins,
+        get_value);
 
     utils::stream_sync();
 }

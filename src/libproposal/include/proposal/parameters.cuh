@@ -23,6 +23,8 @@ struct Parameters;
 
 template<>
 struct Parameters<CC80> {
+    static constexpr std::int32_t CC = CC80;
+
     //
     // Symbolic 1
     //
@@ -147,6 +149,8 @@ struct Parameters<CC80> {
 
 template<>
 struct Parameters<CC86> {
+    static constexpr std::int32_t CC = CC86;
+
     //
     // Symbolic 1
     //
@@ -276,32 +280,17 @@ enum class BinningType : std::int8_t {
     NUM_F64
 };
 
-template<typename Params, BinningType BinType>
-__host__ consteval auto get_ranges() {
+template<std::int32_t CC, BinningType BinType>
+__host__ __device__ consteval auto get_ranges() {
     if constexpr (BinType == BinningType::SYM1) {
-        return Params::SYM1_RANGES;
+        return Parameters<CC>::SYM1_RANGES;
     } else if constexpr (BinType == BinningType::SYM2) {
-        return Params::SYM2_RANGES;
+        return Parameters<CC>::SYM2_RANGES;
     } else if constexpr (BinType == BinningType::NUM_F32) {
-        return Params::NUM_RANGES_F32;
+        return Parameters<CC>::NUM_RANGES_F32;
     } else if constexpr (BinType == BinningType::NUM_F64) {
-        return Params::NUM_RANGES_F64;
+        return Parameters<CC>::NUM_RANGES_F64;
     }
-}
-
-template<BinningType BinType>
-__device__ consteval auto get_ranges() {
-#ifdef __CUDA_ARCH__
-    if constexpr (BinType == BinningType::SYM1) {
-        return Parameters<__CUDA_ARCH__>::SYM1_RANGES;
-    } else if constexpr (BinType == BinningType::SYM2) {
-        return Parameters<__CUDA_ARCH__>::SYM2_RANGES;
-    } else if constexpr (BinType == BinningType::NUM_F32) {
-        return Parameters<__CUDA_ARCH__>::NUM_RANGES_F32;
-    } else if constexpr (BinType == BinningType::NUM_F64) {
-        return Parameters<__CUDA_ARCH__>::NUM_RANGES_F64;
-    }
-#endif
 }
 
 } // namespace proposal
