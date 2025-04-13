@@ -25,8 +25,8 @@ namespace cg = cooperative_groups;
 
 __forceinline__ __device__ auto find_key(const std::int32_t* const __restrict__ cols,
                                          const std::int32_t size,
-                                         const std::int32_t key) -> std::int32_t {
-    auto low = 0;
+                                         const std::int32_t key,
+                                         std::int32_t low = 0) -> std::int32_t {
     auto high = size - 1;
     while (low < high) {
         const auto mid = low + ((high - low) / 2);
@@ -101,9 +101,11 @@ __launch_bounds__(BLOCK_SIZE) __global__
         const auto a_value = a_val[i];
         const auto colrow = a_col[i];
         const auto b_rpt_end = b_rpt[colrow + 1];
+        std::int32_t low = 0;
         for (auto k = b_rpt[colrow]; k < b_rpt_end; k++) {
-            const auto idx = find_key(s_cols, size, b_col[k]);
+            const auto idx = find_key(s_cols, size, b_col[k], low);
             atomicAdd_block(s_vals + idx, a_value * b_val[k]);
+            low = idx + 1;
         }
     }
     tile.sync();
@@ -133,6 +135,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
+    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     auto* s_vals = reinterpret_cast<T*>(smem);
@@ -157,9 +160,15 @@ __launch_bounds__(BLOCK_SIZE) __global__
         const auto a_value = a_val[i];
         const auto colrow = a_col[i];
         const auto b_rpt_end = b_rpt[colrow + 1];
-        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt_end; k += k_step) {
-            const auto idx = find_key(s_cols, size, b_col[k]);
-            atomicAdd_block(s_vals + idx, a_value * b_val[k]);
+        std::int32_t low = 0;
+        for (auto k_warp = b_rpt[colrow]; k_warp < b_rpt_end; k_warp += k_step) {
+            const auto k = k_warp + k_offset;
+            std::int32_t idx = 0;
+            if (k < b_rpt_end) {
+                idx = find_key(s_cols, size, b_col[k], low);
+                atomicAdd_block(s_vals + idx, a_value * b_val[k]);
+            }
+            low = warp.shfl(idx + 1, WARP_SIZE - 1);
         }
     }
     block.sync();
@@ -189,6 +198,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
+    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     auto* s_cols = reinterpret_cast<std::int32_t*>(smem);
@@ -213,9 +223,15 @@ __launch_bounds__(BLOCK_SIZE) __global__
         const auto a_value = a_val[i];
         const auto colrow = a_col[i];
         const auto b_rpt_end = b_rpt[colrow + 1];
-        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt_end; k += k_step) {
-            const auto idx = find_key(s_cols, size, b_col[k]);
-            atomicAdd_block(vals + idx, a_value * b_val[k]);
+        std::int32_t low = 0;
+        for (auto k_warp = b_rpt[colrow]; k_warp < b_rpt_end; k_warp += k_step) {
+            const auto k = k_warp + k_offset;
+            std::int32_t idx = 0;
+            if (k < b_rpt_end) {
+                idx = find_key(s_cols, size, b_col[k], low);
+                atomicAdd_block(vals + idx, a_value * b_val[k]);
+            }
+            low = warp.shfl(idx + 1, WARP_SIZE - 1);
         }
     }
 }
@@ -234,6 +250,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
                       __grid_constant__ T* const __restrict__ c_val) {
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
+    const auto warp = cg::tiled_partition<WARP_SIZE>(block);
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
     const auto row = bins[grid.block_rank()];
@@ -254,9 +271,15 @@ __launch_bounds__(BLOCK_SIZE) __global__
         const auto a_value = a_val[i];
         const auto colrow = a_col[i];
         const auto b_rpt_end = b_rpt[colrow + 1];
-        for (auto k = b_rpt[colrow] + k_offset; k < b_rpt_end; k += k_step) {
-            const auto idx = find_key(cols, size, b_col[k]);
-            atomicAdd_block(vals + idx, a_value * b_val[k]);
+        std::int32_t low = 0;
+        for (auto k_warp = b_rpt[colrow]; k_warp < b_rpt_end; k_warp += k_step) {
+            const auto k = k_warp + k_offset;
+            std::int32_t idx = 0;
+            if (k < b_rpt_end) {
+                idx = find_key(cols, size, b_col[k], low);
+                atomicAdd_block(vals + idx, a_value * b_val[k]);
+            }
+            low = warp.shfl(idx + 1, WARP_SIZE - 1);
         }
     }
 }
