@@ -64,7 +64,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto tile = cg::tiled_partition<PWARP_SIZE>(block);
+    const auto pwarp = cg::tiled_partition<PWARP_SIZE>(block);
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto tip = utils::modpow2(tib, PWARP_SIZE);
@@ -78,7 +78,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     auto* p_table = reinterpret_cast<std::int32_t*>(p_smem);
     for (auto i = tip; i < TABLE_SIZE; i += PWARP_SIZE)
         p_table[i] = HASH_EMPTY;
-    tile.sync();
+    pwarp.sync();
 
     // Aggregate column indices in hash table
     const auto row = bins[row_id];
@@ -98,19 +98,19 @@ __launch_bounds__(BLOCK_SIZE) __global__
             }
         }
     }
-    tile.sync();
+    pwarp.sync();
 
     // Prepare cols for sorting
     std::int32_t l_cols[ITEMS_PER_THREAD];
     for (auto i = tip; i < TABLE_SIZE; i += PWARP_SIZE)
         l_cols[utils::divpow2(i, PWARP_SIZE)] = p_table[i];
-    tile.sync();
+    pwarp.sync();
 
     // Sort using merge sort
     auto* l_ucols = reinterpret_cast<std::uint32_t(*)[ITEMS_PER_THREAD]>(&l_cols);
     auto* sort_storage = reinterpret_cast<SortTempStorageT*>(p_smem);
     SortT(*sort_storage).Sort(*l_ucols, cuda::std::less<std::uint32_t>{});
-    tile.sync();
+    pwarp.sync();
 
     // Write to C.col
     const auto c_offset = c_rpt[row];

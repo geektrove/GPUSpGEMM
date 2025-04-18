@@ -71,7 +71,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto tile = cg::tiled_partition<PWARP_SIZE>(block);
+    const auto pwarp = cg::tiled_partition<PWARP_SIZE>(block);
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto tip = utils::modpow2(tib, PWARP_SIZE);
@@ -91,11 +91,11 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto size = c_rpt[row + 1] - c_offset;
     assert(size <= ARRAY_SIZE);
 
-    cg::memcpy_async(tile, s_cols, c_col + c_offset, size * sizeof(*s_cols));
+    cg::memcpy_async(pwarp, s_cols, c_col + c_offset, size * sizeof(*s_cols));
     for (auto i = tip; i < size; i += PWARP_SIZE)
         s_vals[i] = 0;
-    cg::wait(tile);
-    tile.sync();
+    cg::wait(pwarp);
+    pwarp.sync();
 
     const auto a_rpt_end = a_rpt[row + 1];
     for (auto i = a_rpt[row] + tip; i < a_rpt_end; i += PWARP_SIZE) {
@@ -109,10 +109,10 @@ __launch_bounds__(BLOCK_SIZE) __global__
             low = idx + 1;
         }
     }
-    tile.sync();
+    pwarp.sync();
 
-    cg::memcpy_async(tile, c_val + c_offset, s_vals, size * sizeof(T));
-    cg::wait(tile);
+    cg::memcpy_async(pwarp, c_val + c_offset, s_vals, size * sizeof(T));
+    cg::wait(pwarp);
 }
 
 template<std::floating_point T, std::int32_t BLOCK_SIZE, std::int32_t ARRAY_SIZE>

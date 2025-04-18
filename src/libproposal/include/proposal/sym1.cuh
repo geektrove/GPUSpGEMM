@@ -52,7 +52,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
 
     const auto grid = cg::this_grid();
     const auto block = cg::this_thread_block();
-    const auto tile = cg::tiled_partition<PWARP_SIZE>(block);
+    const auto pwarp = cg::tiled_partition<PWARP_SIZE>(block);
     const auto tig = gsl::narrow_cast<std::int32_t>(grid.thread_rank());
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
     const auto tip = utils::modpow2(tib, PWARP_SIZE);
@@ -91,9 +91,9 @@ __launch_bounds__(BLOCK_SIZE) __global__
             }
         }
     }
-    tile.sync();
+    pwarp.sync();
 
-    cg::reduce_store_async(tile, &nnzs[row], l_nnz, cg::plus<std::int32_t>{});
+    cg::reduce_store_async(pwarp, &nnzs[row], l_nnz, cg::plus<std::int32_t>{});
 }
 
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
