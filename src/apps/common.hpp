@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdlib>
 #include <functional>
 #include <thread>
@@ -11,14 +13,25 @@
 #include <cusparse/cusparse.cuh>
 #include <utils/utils.cuh>
 
-constexpr auto DEFAULT_PAUSE_MS = 100;
-
-auto main(int argc, char** argv) -> int {
-    using ValueType = double;
+template<typename ValueType,
+         typename ConvertToAppDeviceCSR,
+         typename RunT,
+         typename MeasureT>
+auto run_app(const std::string& name,
+             ConvertToAppDeviceCSR convert_to_app_device_csr,
+             RunT run,
+             MeasureT measure,
+             int argc,
+             char** argv) -> int {
     using Clock = std::chrono::steady_clock;
 
+    static constexpr auto DEFAULT_PAUSE_MS = 50;
+
+    //
     // Parse command line arguments
-    CLI::App app{"cuSPARSE"};
+    //
+
+    CLI::App app{name};
     app.require_subcommand(1, 1);
 
     app.add_option("inputA")
@@ -34,6 +47,9 @@ auto main(int argc, char** argv) -> int {
         ->check(
             CLI::IsMember({"trace", "debug", "info", "warn", "error", "critical", "off"}))
         ->default_str("info");
+
+    app.add_subcommand("validate")
+        ->description("Validate the result matrix using cuSPARSE 2");
 
     auto* save = app.add_subcommand("save")->description(
         "Save the result matrix to a file");
@@ -56,11 +72,17 @@ auto main(int argc, char** argv) -> int {
 
     CLI11_PARSE(app, argc, argv);
 
+    //
     // Set logging level
+    //
+
     const auto& loglevel = app["--loglevel"]->as<std::string>();
     spdlog::set_level(spdlog::level::from_str(loglevel));
 
+    //
     // Load matrices
+    //
+
     const auto& inputA = app["inputA"]->as<std::string>();
     const auto& inputB = app["inputB"]->as<std::string>();
     const auto h_a = utils::HostCSR<ValueType>::load_from_filename(inputA);
@@ -69,19 +91,57 @@ auto main(int argc, char** argv) -> int {
         SPDLOG_ERROR("Matrix A columns ({}) must match matrix B rows ({})", h_a.n, h_b.m);
         return EXIT_FAILURE;
     }
-    const auto d_a = h_a.to<utils::Location::Device>();
-    const auto d_b = h_b.to<utils::Location::Device>();
 
+    //
+    // Validate
+    //
+
+    if (app.got_subcommand("validate")) {
+        const auto h_c = std::invoke([&] {
+            const auto app_d_a = convert_to_app_device_csr(h_a);
+            const auto app_d_b = convert_to_app_device_csr(h_b);
+            return run(app_d_a, app_d_b);
+        });
+        const auto h_c_cusparse = std::invoke([&] {
+            const auto d_a = h_a.template to<utils::Location::Device>();
+            const auto d_b = h_b.template to<utils::Location::Device>();
+            return cusparse2(d_a, d_b).template to<utils::Location::Host>();
+        });
+
+        if (h_c == h_c_cusparse) {
+            fmt::println("Validation succeeded");
+        } else {
+            fmt::println("Validation failed");
+            fmt::println("Matrix C: {} x {} ({} non-zero elements)",
+                         h_c.m,
+                         h_c.n,
+                         h_c.nnz);
+            fmt::println("Matrix C (cuSPARSE): {} x {} ({} non-zero elements)",
+                         h_c_cusparse.m,
+                         h_c_cusparse.n,
+                         h_c_cusparse.nnz);
+        }
+    }
+
+    //
     // Save
+    //
+
     if (app.got_subcommand("save")) {
         const auto& output = save->get_option("output")->as<std::string>();
         fmt::println("Saving result to {}", output);
-        const auto h_c = std::invoke(
-            [&] { return cusparse(d_a, d_b).to<utils::Location::Host>(); });
+        const auto h_c = std::invoke([&] {
+            const auto app_d_a = convert_to_app_device_csr(h_a);
+            const auto app_d_b = convert_to_app_device_csr(h_b);
+            return run(app_d_a, app_d_b);
+        });
         h_c.save_to_filename(output);
     }
 
+    //
     // Benchmark
+    //
+
     if (app.got_subcommand("benchmark")) {
         // Initialize NVTX
 #ifndef NVTX_DISABLE
@@ -91,31 +151,33 @@ auto main(int argc, char** argv) -> int {
         const auto& runs = benchmark->get_option("--runs")->as<int>();
         const auto& warmups = benchmark->get_option("--warmups")->as<int>();
         const auto& pause = benchmark->get_option("--pause")->as<int>();
+        const auto pause_ms = std::chrono::milliseconds(pause);
+
+        const auto app_d_a = convert_to_app_device_csr(h_a);
+        const auto app_d_b = convert_to_app_device_csr(h_b);
 
         // Warmup
         for (int i = 0; i < warmups; i++) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(pause));
-            auto c = cusparse(d_a, d_b);
-            utils::device_sync();
+            std::this_thread::sleep_for(pause_ms);
+            measure(app_d_a, app_d_b);
         }
 
         // Execute
         std::vector<Clock::duration> times(runs);
         for (int i = 0; i < runs; i++) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(pause));
-            const auto start = Clock::now();
-            auto c = cusparse(d_a, d_b);
-            utils::device_sync();
-            const auto end = Clock::now();
-            times[i] = end - start;
+            std::this_thread::sleep_for(pause_ms);
+            times[i] = measure(app_d_a, app_d_b);
         }
 
         // Compute FLOPs
-        const auto nip = utils::get_nip(d_a, d_b);
+        const auto nip = std::invoke([&] {
+            const auto d_a = h_a.template to<utils::Location::Device>();
+            const auto d_b = h_b.template to<utils::Location::Device>();
+            return utils::get_nip(d_a, d_b);
+        });
         const auto flop = 2.0 * nip;
 
         // Print results
-        fmt::println("Timestamp: {}", std::chrono::system_clock::now());
         for (int i = 0; i < runs; i++) {
             const auto seconds = std::chrono::duration<double>(times[i]).count();
             const auto flops = flop / seconds;
