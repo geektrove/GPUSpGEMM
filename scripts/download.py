@@ -26,8 +26,6 @@ MATRICES = [
     "Um/2cubes_sphere",
     "FEMLAB/poisson3Da",
     "Oberwolfach/filter3D",
-    # "FreeFieldTechnologies/mono_500Hz",
-    # "QCD/conf5_4-8x8-05",
     "Williams/cant",
     "Williams/consph",
     "DNVS/shipsec1",
