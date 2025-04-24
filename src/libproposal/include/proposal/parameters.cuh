@@ -41,8 +41,7 @@ struct Parameters<CC80> {
     static_assert(SYM1_BLOCK_SIZES.size() == SYM1_TABLE_SIZES.size());
     static_assert(SYM1_BLOCK_SIZES.size() == SYM1_SMEM_SIZES.size());
 
-    static constexpr auto SYM1_N_BINS = gsl::narrow_cast<std::int32_t>(
-        SYM1_BLOCK_SIZES.size());
+    static constexpr std::int32_t SYM1_N_BINS = SYM1_BLOCK_SIZES.size();
     static constexpr auto SYM1_GLOBAL_MEM_BIN = SYM1_N_BINS - 1;
     static constexpr auto SYM1_MAX_SMEM_BIN = SYM1_N_BINS - 2;
 
@@ -75,8 +74,7 @@ struct Parameters<CC80> {
     static_assert(SYM2_BLOCK_SIZES.size() == SYM2_TABLE_SIZES.size());
     static_assert(SYM2_BLOCK_SIZES.size() == SYM2_SMEM_SIZES.size());
 
-    static constexpr auto SYM2_N_BINS = gsl::narrow_cast<std::int32_t>(
-        SYM2_BLOCK_SIZES.size());
+    static constexpr std::int32_t SYM2_N_BINS = SYM2_BLOCK_SIZES.size();
     static constexpr auto SYM2_GLOBAL_MEM_BIN = SYM2_N_BINS - 1;
 
     static constexpr cuda::std::array SYM2_RANGES = std::invoke([] {
@@ -113,8 +111,7 @@ struct Parameters<CC80> {
     static_assert(NUM_BLOCK_SIZES.size() == NUM_ARRAY_SIZES_F64.size());
     static_assert(NUM_BLOCK_SIZES.size() == NUM_SMEM_SIZES_F64.size());
 
-    static constexpr auto NUM_N_BINS = gsl::narrow_cast<std::int32_t>(
-        NUM_BLOCK_SIZES.size());
+    static constexpr std::int32_t NUM_N_BINS = NUM_BLOCK_SIZES.size();
     static constexpr auto NUM_GLOBAL_MEM_BIN = NUM_N_BINS - 1;
     static constexpr auto NUM_SMEM_COLS_BIN_BEGIN = NUM_N_BINS - 2;
     static constexpr auto NUM_SMEM_REGULAR_BIN_BEGIN = NUM_N_BINS - 4;
@@ -167,8 +164,7 @@ struct Parameters<CC86> {
     static_assert(SYM1_BLOCK_SIZES.size() == SYM1_TABLE_SIZES.size());
     static_assert(SYM1_BLOCK_SIZES.size() == SYM1_SMEM_SIZES.size());
 
-    static constexpr auto SYM1_N_BINS = gsl::narrow_cast<std::int32_t>(
-        SYM1_BLOCK_SIZES.size());
+    static constexpr std::int32_t SYM1_N_BINS = SYM1_BLOCK_SIZES.size();
     static constexpr auto SYM1_GLOBAL_MEM_BIN = SYM1_N_BINS - 1;
     static constexpr auto SYM1_MAX_SMEM_BIN = SYM1_N_BINS - 2;
 
@@ -201,8 +197,7 @@ struct Parameters<CC86> {
     static_assert(SYM2_BLOCK_SIZES.size() == SYM2_TABLE_SIZES.size());
     static_assert(SYM2_BLOCK_SIZES.size() == SYM2_SMEM_SIZES.size());
 
-    static constexpr auto SYM2_N_BINS = gsl::narrow_cast<std::int32_t>(
-        SYM2_BLOCK_SIZES.size());
+    static constexpr std::int32_t SYM2_N_BINS = SYM2_BLOCK_SIZES.size();
     static constexpr auto SYM2_GLOBAL_MEM_BIN = SYM2_N_BINS - 1;
 
     static constexpr cuda::std::array SYM2_RANGES = std::invoke([] {
@@ -239,8 +234,7 @@ struct Parameters<CC86> {
     static_assert(NUM_BLOCK_SIZES.size() == NUM_ARRAY_SIZES_F64.size());
     static_assert(NUM_BLOCK_SIZES.size() == NUM_SMEM_SIZES_F64.size());
 
-    static constexpr auto NUM_N_BINS = gsl::narrow_cast<std::int32_t>(
-        NUM_BLOCK_SIZES.size());
+    static constexpr std::int32_t NUM_N_BINS = NUM_BLOCK_SIZES.size();
     static constexpr auto NUM_GLOBAL_MEM_BIN = NUM_N_BINS - 1;
     static constexpr auto NUM_SMEM_COLS_BIN_BEGIN = NUM_N_BINS - 2;
     static constexpr auto NUM_SMEM_REGULAR_BIN_BEGIN = NUM_N_BINS - 4;
