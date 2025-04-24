@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <cuda/atomic>
 
-#include <cusparse.h>
+#include <cooperative_groups.h>
+#include <cub/cub.cuh>
 
 #include <utils/csr.cuh>
 #include <utils/errors.cuh>
@@ -10,99 +12,59 @@
 
 namespace utils {
 
+namespace cg = cooperative_groups;
+
+template<std::int32_t BLOCK_SIZE>
+__launch_bounds__(BLOCK_SIZE) __global__
+    void k_get_nip(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
+                   const __grid_constant__ std::int32_t* const __restrict__ a_col,
+                   const __grid_constant__ std::int32_t* const __restrict__ b_rpt,
+                   const __grid_constant__ std::int32_t m,
+                   __grid_constant__ std::int64_t* const __restrict__ nip) {
+    using ReduceT = cub::
+        BlockReduce<std::int32_t, BLOCK_SIZE, cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>;
+
+    __shared__ typename ReduceT::TempStorage s_storage;
+
+    const auto tig = gsl::narrow_cast<std::int32_t>(cg::this_grid().thread_rank());
+
+    const auto a_rpt_start = tig < m ? a_rpt[tig] : 0;
+    const auto a_rpt_end = tig < m ? a_rpt[tig + 1] : 0;
+    std::int32_t row_nip = 0;
+    for (auto j = a_rpt_start; j < a_rpt_end; j++) {
+        const auto col = a_col[j];
+        row_nip += b_rpt[col + 1] - b_rpt[col];
+    }
+
+    const std::int64_t sum = ReduceT(s_storage).Sum(row_nip);
+    cg::invoke_one(cg::this_thread_block(), [&] {
+        cuda::atomic_ref<std::int64_t, cuda::thread_scope_device> ref(*nip);
+        ref.fetch_add(sum);
+    });
+}
+
 template<std::floating_point T>
 auto get_nip(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> std::int64_t {
-    // Initialize cuSPARSE
-    cusparseHandle_t handle{};
-    handle_cusparse_error(cusparseCreate(&handle));
+    static constexpr std::int32_t BLOCK_SIZE = 512;
 
-    // Create cuSPARSE matrix descriptors
-    cusparseSpMatDescr_t desc_a{};
-    handle_cusparse_error(cusparseCreateCsr(&desc_a,
-                                            a.m,
-                                            a.n,
-                                            a.nnz,
-                                            a.rpt,
-                                            a.col,
-                                            a.val,
-                                            CUSPARSE_INDEX_32I,
-                                            CUSPARSE_INDEX_32I,
-                                            CUSPARSE_INDEX_BASE_ZERO,
-                                            CUDA_R_64F));
-    cusparseSpMatDescr_t desc_b{};
-    handle_cusparse_error(cusparseCreateCsr(&desc_b,
-                                            b.m,
-                                            b.n,
-                                            b.nnz,
-                                            b.rpt,
-                                            b.col,
-                                            b.val,
-                                            CUSPARSE_INDEX_32I,
-                                            CUSPARSE_INDEX_32I,
-                                            CUSPARSE_INDEX_BASE_ZERO,
-                                            CUDA_R_64F));
-    cusparseSpMatDescr_t desc_c{};
-    handle_cusparse_error(cusparseCreateCsr(&desc_c,
-                                            a.m,
-                                            b.n,
-                                            0,
-                                            nullptr,
-                                            nullptr,
-                                            nullptr,
-                                            CUSPARSE_INDEX_32I,
-                                            CUSPARSE_INDEX_32I,
-                                            CUSPARSE_INDEX_BASE_ZERO,
-                                            CUDA_R_64F));
+    std::int64_t nip = 0;
+    auto* tmp = utils::malloc_async<Location::Device>(sizeof(std::int64_t));
+    auto* d_nip = static_cast<std::int64_t*>(tmp);
+    utils::memset_async(d_nip, 0, sizeof(std::int64_t));
+    utils::launch_kernel(k_get_nip<BLOCK_SIZE>,
+                         cuda::ceil_div(a.m, BLOCK_SIZE),
+                         BLOCK_SIZE,
+                         0,
+                         cudaStreamDefault,
+                         a.rpt,
+                         a.col,
+                         b.rpt,
+                         a.m,
+                         d_nip);
+    utils::memcpy_async(&nip, d_nip, sizeof(std::int64_t));
+    utils::free_async(d_nip);
 
-    // Initialize cuSPARSE SpGEMM descriptor
-    cusparseSpGEMMDescr_t spgemm_desc{};
-    handle_cusparse_error(cusparseSpGEMM_createDescr(&spgemm_desc));
-
-    // Set parameters for the algorithm
-    const double alpha = 1.0;
-    const double beta = 0.0;
-
-    // First stage
-    size_t buffer1_size{};
-    handle_cusparse_error(cusparseSpGEMM_workEstimation(handle,
-                                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        &alpha,
-                                                        desc_a,
-                                                        desc_b,
-                                                        &beta,
-                                                        desc_c,
-                                                        CUDA_R_64F,
-                                                        CUSPARSE_SPGEMM_DEFAULT,
-                                                        spgemm_desc,
-                                                        &buffer1_size,
-                                                        nullptr));
-    void* buffer1 = malloc<Location::Device>(buffer1_size);
-    handle_cusparse_error(cusparseSpGEMM_workEstimation(handle,
-                                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                                        &alpha,
-                                                        desc_a,
-                                                        desc_b,
-                                                        &beta,
-                                                        desc_c,
-                                                        CUDA_R_64F,
-                                                        CUSPARSE_SPGEMM_DEFAULT,
-                                                        spgemm_desc,
-                                                        &buffer1_size,
-                                                        buffer1));
-
-    // Extract the number of intermediate products
-    std::int64_t nip{};
-    handle_cusparse_error(cusparseSpGEMM_getNumProducts(spgemm_desc, &nip));
-
-    // Clean up
-    free<Location::Device>(buffer1);
-    handle_cusparse_error(cusparseSpGEMM_destroyDescr(spgemm_desc));
-    handle_cusparse_error(cusparseDestroySpMat(desc_c));
-    handle_cusparse_error(cusparseDestroySpMat(desc_b));
-    handle_cusparse_error(cusparseDestroySpMat(desc_a));
-    handle_cusparse_error(cusparseDestroy(handle));
+    utils::stream_sync();
 
     return nip;
 }
