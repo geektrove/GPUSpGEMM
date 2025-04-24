@@ -7,4 +7,4 @@
 #SBATCH --error=logs/%x.%j.err
 
 inv validate --preset=release --target=opsparse
-inv benchmark --target=opsparse
+inv benchmark --target=opsparse --results-dir=results/fit-cluster

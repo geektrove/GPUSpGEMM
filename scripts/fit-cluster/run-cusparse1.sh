@@ -7,4 +7,4 @@
 #SBATCH --error=logs/%x.%j.err
 
 inv validate --preset=release --target=cusparse1
-inv benchmark --target=cusparse1
+inv benchmark --target=cusparse1 --results-dir=results/fit-cluster

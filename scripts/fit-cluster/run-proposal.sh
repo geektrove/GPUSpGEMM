@@ -7,4 +7,4 @@
 #SBATCH --error=logs/%x.%j.err
 
 inv validate --preset=release --target=proposal
-inv benchmark --target=proposal
+inv benchmark --target=proposal --results-dir=results/fit-cluster
