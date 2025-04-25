@@ -112,7 +112,12 @@ auto proposal(const utils::DeviceCSR<T>& A, const utils::DeviceCSR<T>& B)
         return proposal_inner<T, Parameters<CC86>>(A, B);
 #endif
 
-    throw std::runtime_error("Unsupported compute capability");
+#if defined(COMPUTE_89)
+    if (CC == CC89)
+        return proposal_inner<T, Parameters<CC89>>(A, B);
+#endif
+
+    throw std::runtime_error(fmt::format("Unsupported compute capability: {}", CC));
 }
 
 } // namespace proposal
