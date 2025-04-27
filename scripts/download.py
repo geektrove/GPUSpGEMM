@@ -14,29 +14,17 @@ import scipy.io
 BASE_URL = "https://sparse.tamu.edu/mat"
 MATRICES = [
     "JGD_Homology/m133-b3",
-    "Williams/mac_econ_fwd500",
-    "Pajek/patents_main",
     "Williams/webbase-1M",
     "Williams/mc2depi",
-    "Hamm/scircuit",
     "GHS_indef/mario002",
-    "vanHeukelum/cage12",
     "QLi/majorbasis",
-    "Um/offshore",
-    "Um/2cubes_sphere",
-    "FEMLAB/poisson3Da",
-    "Oberwolfach/filter3D",
-    "Williams/cant",
-    "Williams/consph",
     "DNVS/shipsec1",
     "Bova/rma10",
-    "DIMACS10/delaunay_n24",
-    "vanHeukelum/cage15",
-    "Gleich/wb-edu",
-    "Williams/cop20k_A",
-    "GHS_psdef/hood",
-    "Boeing/pwtk",
     "Williams/pdb1HYS",
+    "Chen/pkustk12",
+    "PARSEC/SiO2",
+    "QY/case39",
+    "Gupta/gupta3",
 ]
 URLS = [f"{BASE_URL}/{name}.mat" for name in MATRICES]
 
