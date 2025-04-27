@@ -17,3 +17,4 @@ justfile
 /slurm/
 /results/
 /tmp/
+/figures/
