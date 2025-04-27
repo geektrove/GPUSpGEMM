@@ -169,15 +169,20 @@ auto run_app(const std::string& name,
             times[i] = measure(app_d_a, app_d_b);
         }
 
-        // Compute FLOPs
+        // Compute NIP, FLOPs and NNZ
         const auto nip = std::invoke([&] {
             const auto d_a = h_a.template to<utils::Location::Device>();
             const auto d_b = h_b.template to<utils::Location::Device>();
             return utils::get_nip(d_a, d_b);
         });
         const auto flop = 2.0 * nip;
+        const auto h_c = run(app_d_a, app_d_b);
 
         // Print results
+        fmt::println("A: {} x {} ({} non-zero elements)", h_a.m, h_a.n, h_a.nnz);
+        fmt::println("B: {} x {} ({} non-zero elements)", h_b.m, h_b.n, h_b.nnz);
+        fmt::println("NIP: {}", nip);
+        fmt::println("C: {} x {} ({} non-zero elements)", h_c.m, h_c.n, h_c.nnz);
         for (int i = 0; i < runs; i++) {
             const auto seconds = std::chrono::duration<double>(times[i]).count();
             const auto flops = flop / seconds;
