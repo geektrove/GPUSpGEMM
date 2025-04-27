@@ -97,6 +97,9 @@ struct Parameters<CC80> {
     static constexpr cuda::std::array NUM_BLOCK_SIZES =
         {1024, 128, 256, 512, 1024, 1024, 1024, 1024, 1024, 1024};
     static constexpr cuda::std::array NUM_PWARP_SIZES = {8, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    // The columns only bin with 20736 array size is hidden by the regular bin with 20864 array size
+    // in F32 case, so it's unused and present only for F64 case.
     static constexpr cuda::std::array NUM_ARRAY_SIZES_F32 =
         {10240, 528, 1184, 2496, 5120, 10368, 20864, 20736, 41728, 0};
     static constexpr cuda::std::array NUM_SMEM_SIZES_F32 =
@@ -220,6 +223,9 @@ struct Parameters<CC86> {
     static constexpr cuda::std::array NUM_BLOCK_SIZES =
         {512, 128, 256, 512, 1024, 768, 1024, 1024};
     static constexpr cuda::std::array NUM_PWARP_SIZES = {8, 0, 0, 0, 0, 0, 0, 0};
+
+    // The columns only bin with 12544 array size is hidden by the regular bin with 12672 array size
+    // in F32 case, so it's unused and present only for F64 case.
     static constexpr cuda::std::array NUM_ARRAY_SIZES_F32 =
         {4096, 938, 2004, 4138, 12672, 12544, 25344, 0};
     static constexpr cuda::std::array NUM_SMEM_SIZES_F32 =
@@ -343,6 +349,9 @@ struct Parameters<CC89> {
     static constexpr cuda::std::array NUM_BLOCK_SIZES =
         {512, 128, 256, 512, 1024, 768, 1024, 1024};
     static constexpr cuda::std::array NUM_PWARP_SIZES = {8, 0, 0, 0, 0, 0, 0, 0};
+
+    // The columns only bin with 12544 array size is hidden by the regular bin with 12672 array size
+    // in F32 case, so it's unused and present only for F64 case.
     static constexpr cuda::std::array NUM_ARRAY_SIZES_F32 =
         {4096, 938, 2004, 4138, 12672, 12544, 25344, 0};
     static constexpr cuda::std::array NUM_SMEM_SIZES_F32 =
