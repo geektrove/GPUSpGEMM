@@ -46,6 +46,10 @@ function(_customize_target_wrapped name visibility)
         endif()
     endif()
 
+    if(USE_DOUBLE_PRECISION)
+        target_compile_definitions(${name} ${visibility} USE_DOUBLE_PRECISION)
+    endif()
+
     target_compile_definitions(${name} ${visibility}
                                        CUDA_API_PER_THREAD_DEFAULT_STREAM)
     target_compile_definitions(

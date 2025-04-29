@@ -160,7 +160,7 @@ CSR::CSR(const CSR& A) {
     nnz = A.nnz;
     rpt = new mint[M + 1];
     col = new mint[nnz];
-    val = new double[nnz];
+    val = new mdouble[nnz];
     memcpy(rpt, A.rpt, (M + 1) * sizeof(mint));
     memcpy(col, A.col, nnz * sizeof(mint));
     memcpy(val, A.val, nnz * sizeof(mdouble));
@@ -176,7 +176,7 @@ CSR& CSR::operator=(const CSR& A) {
     nnz = A.nnz;
     rpt = new mint[M + 1];
     col = new mint[nnz];
-    val = new double[nnz];
+    val = new mdouble[nnz];
     memcpy(rpt, A.rpt, (M + 1) * sizeof(mint));
     memcpy(col, A.col, nnz * sizeof(mint));
     memcpy(val, A.val, nnz * sizeof(mdouble));

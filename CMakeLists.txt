@@ -7,6 +7,7 @@ project(
     VERSION 0.1.0
     LANGUAGES CXX CUDA)
 
+include(cmake/options.cmake)
 include(cmake/ipo.cmake)
 include(cmake/dependencies.cmake)
 include(cmake/wrappers.cmake)

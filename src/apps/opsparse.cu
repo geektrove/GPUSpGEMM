@@ -6,7 +6,11 @@
 
 auto main(int argc, char** argv) -> int {
     using Clock = std::chrono::steady_clock;
+#ifdef USE_DOUBLE_PRECISION
     using ValueType = double;
+#else
+    using ValueType = float;
+#endif
 
     auto convert_to_app_device_csr = [](const utils::HostCSR<ValueType>& h_a) -> CSR {
         auto A = convertFromUtilsCSR(h_a);

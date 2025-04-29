@@ -17,7 +17,11 @@
 
 //typedef unsigned int mint;
 typedef int mint;
+#ifdef USE_DOUBLE_PRECISION
 typedef double mdouble;
+#else
+typedef float mdouble;
+#endif
 
 inline static void checkCUDA(cudaError_t err,
 							   const char *file,
