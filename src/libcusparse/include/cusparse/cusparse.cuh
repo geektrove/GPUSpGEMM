@@ -6,6 +6,7 @@
 
 #include <cusparse.h>
 #include <gsl/gsl-lite.hpp>
+#include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 
 #include <utils/utils.cuh>
@@ -13,6 +14,8 @@
 template<std::floating_point T>
 auto cusparse1(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
     -> utils::DeviceCSR<T> {
+    NVTX3_FUNC_RANGE();
+
     static constexpr auto DATA_TYPE = std::is_same_v<T, float> ? CUDA_R_32F : CUDA_R_64F;
     static constexpr T ALPHA = 1.0;
     static constexpr T BETA = 0.0;
@@ -168,6 +171,8 @@ auto cusparse1(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
 template<std::floating_point T>
 auto cusparse2(const utils::DeviceCSR<T>& a, const utils::DeviceCSR<T>& b)
     -> utils::DeviceCSR<T> {
+    NVTX3_FUNC_RANGE();
+
     static constexpr auto DATA_TYPE = std::is_same_v<T, float> ? CUDA_R_32F : CUDA_R_64F;
     static constexpr T ALPHA = 1.0;
     static constexpr T BETA = 0.0;
