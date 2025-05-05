@@ -22,6 +22,10 @@ inline constexpr std::int32_t CC89 = 890;
 template<std::int32_t ComputeCapability>
 struct Parameters;
 
+//
+// Parameters for compute capability 8.0
+//
+
 template<>
 struct Parameters<CC80> {
     static constexpr std::int32_t CC = CC80;
@@ -148,6 +152,10 @@ struct Parameters<CC80> {
     static constexpr std::int32_t OPTIMAL_BLOCK_SIZE = 1024;
 };
 
+//
+// Parameters for compute capability 8.6
+//
+
 template<>
 struct Parameters<CC86> {
     static constexpr std::int32_t CC = CC86;
@@ -273,6 +281,10 @@ struct Parameters<CC86> {
         {SYM1_N_BINS, SYM2_N_BINS, NUM_N_BINS});
     static constexpr std::int32_t OPTIMAL_BLOCK_SIZE = 512;
 };
+
+//
+// Parameters for compute capability 8.9
+//
 
 template<>
 struct Parameters<CC89> {
@@ -407,6 +419,7 @@ enum class BinningType : std::int8_t {
     NUM_F64
 };
 
+// Get the ranges for the given binning type and compute capability
 template<std::int32_t CC, BinningType BinType>
 __host__ __device__ consteval auto get_ranges() {
     if constexpr (BinType == BinningType::SYM1) {

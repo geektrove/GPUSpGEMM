@@ -10,6 +10,7 @@
 
 namespace utils {
 
+// Returns the smallest power of 2 greater than or equal to a
 template<std::integral T>
 constexpr auto bitceil(T a) {
     assert(a > 0);
@@ -20,6 +21,7 @@ constexpr auto bitceil(T a) {
     return gsl::narrow_cast<T>(result);
 }
 
+// Returns the largest power of 2 less than or equal to a
 template<std::integral T>
 constexpr auto bitfloor(T a) {
     assert(a > 0);
@@ -30,6 +32,7 @@ constexpr auto bitfloor(T a) {
     return gsl::narrow_cast<T>(result);
 }
 
+// Checks if a is a power of 2
 template<std::integral T>
 constexpr auto ispow2(T a) -> bool {
     assert(a > 0);
@@ -39,6 +42,7 @@ constexpr auto ispow2(T a) -> bool {
     return cuda::std::has_single_bit(unsigned_a);
 }
 
+// Returns the base-2 logarithm of a (floor value)
 template<std::integral T>
 constexpr auto ilog2(T a) {
     assert(a > 0);
@@ -49,6 +53,7 @@ constexpr auto ilog2(T a) {
     return gsl::narrow_cast<T>(result);
 }
 
+// Computes a modulo b, where b is a power of 2
 constexpr auto modpow2(std::integral auto a, std::integral auto b) {
     assert(b > 0);
     assert(ispow2(b));
@@ -57,6 +62,7 @@ constexpr auto modpow2(std::integral auto a, std::integral auto b) {
     return a & (b - 1);
 }
 
+// Computes a divided by b, where b is a power of 2
 constexpr auto divpow2(std::integral auto a, std::integral auto b) {
     assert(b > 0);
     assert(ispow2(b));

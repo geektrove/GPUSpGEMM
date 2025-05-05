@@ -4,7 +4,6 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <cuda/std/cstddef>
 #include <type_traits>
 
@@ -24,6 +23,8 @@ namespace proposal {
 
 namespace cg = cooperative_groups;
 
+// Binary search to find position of a key in a sorted array
+// Used to locate column indices during numeric computation
 __forceinline__ __device__ auto find_key(const std::int32_t* const __restrict__ cols,
                                          const std::int32_t size,
                                          const std::int32_t key,
@@ -77,10 +78,12 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto tip = utils::modpow2(tib, PWARP_SIZE);
     const auto pib = utils::divpow2(tib, PWARP_SIZE);
 
+    // Get row id
     const auto row_id = utils::divpow2(tig, PWARP_SIZE);
     if (row_id >= bin_size)
         return;
 
+    // Initialize hash table
     auto* s_vals_all = reinterpret_cast<T*>(smem);
     auto* s_cols_all = reinterpret_cast<std::int32_t*>(s_vals_all + TOTAL_ARRAY_SIZE);
     auto* s_vals = s_vals_all + (pib * ARRAY_SIZE);
@@ -91,12 +94,14 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto size = c_rpt[row + 1] - c_offset;
     assert(size <= ARRAY_SIZE);
 
+    // Copy column indices to shared memory and initialize values to 0
     cg::memcpy_async(pwarp, s_cols, c_col + c_offset, size * sizeof(*s_cols));
     for (auto i = tip; i < size; i += PWARP_SIZE)
         s_vals[i] = 0;
     cg::wait(pwarp);
     pwarp.sync();
 
+    // Compute values for the row
     const auto a_rpt_end = a_rpt[row + 1];
     for (auto i = a_rpt[row] + tip; i < a_rpt_end; i += PWARP_SIZE) {
         const auto a_value = a_val[i];
@@ -111,6 +116,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
     pwarp.sync();
 
+    // Copy values to result matrix
     cg::memcpy_async(pwarp, c_val + c_offset, s_vals, size * sizeof(T));
     cg::wait(pwarp);
 }
@@ -146,12 +152,14 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto c_offset = c_rpt[row];
     const auto size = c_rpt[row + 1] - c_offset;
 
+    // Copy column indices to shared memory and initialize values to 0
     cg::memcpy_async(block, s_cols, c_col + c_offset, size * sizeof(*s_cols));
     for (auto i = tib; i < size; i += BLOCK_SIZE)
         s_vals[i] = 0;
     cg::wait(block);
     block.sync();
 
+    // Compute values for the row
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
@@ -174,6 +182,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
     block.sync();
 
+    // Copy values to result matrix
     cg::memcpy_async(block, c_val + c_offset, s_vals, size * sizeof(T));
     cg::wait(block);
 }
@@ -209,12 +218,14 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto size = c_rpt[row + 1] - c_offset;
     auto* vals = c_val + c_offset;
 
+    // Copy column indices to shared memory and initialize values to 0
     cg::memcpy_async(block, s_cols, c_col + c_offset, size * sizeof(*s_cols));
     for (auto i = tib; i < size; i += BLOCK_SIZE)
         vals[i] = 0;
     cg::wait(block);
     block.sync();
 
+    // Compute values for the row
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
@@ -263,6 +274,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     for (auto i = tib; i < size; i += BLOCK_SIZE)
         vals[i] = 0;
 
+    // Compute values for the row
     const auto i_offset = utils::divpow2(tib, WARP_SIZE);
     const auto i_step = utils::divpow2(BLOCK_SIZE, WARP_SIZE);
     const auto k_offset = utils::modpow2(tib, WARP_SIZE);
@@ -285,6 +297,9 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
 }
 
+// Main numeric phase function
+// Computes actual values for the result matrix C based on sparsity pattern from symbolic phases
+// Uses specialized kernels based on row characteristics (organized by bins)
 template<std::floating_point T, typename Params>
 void num(const utils::DeviceCSR<T>& A,
          const utils::DeviceCSR<T>& B,

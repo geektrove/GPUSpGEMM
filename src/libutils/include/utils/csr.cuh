@@ -16,14 +16,18 @@
 
 namespace utils {
 
+// Compressed Sparse Row (CSR) matrix representation
+// Template parameters:
+// - T: The floating-point data type (float or double)
+// - L: Location specifier (Host or Device) indicating where the matrix data is stored
 template<std::floating_point T, Location L>
 struct CSR {
-    std::int32_t nnz{};
-    std::int32_t m{};
-    std::int32_t n{};
-    std::int32_t* rpt{};
-    std::int32_t* col{};
-    T* val{};
+    std::int32_t nnz{};  // Number of non-zero elements
+    std::int32_t m{};    // Number of rows
+    std::int32_t n{};    // Number of columns
+    std::int32_t* rpt{}; // Row pointers (array of size m+1)
+    std::int32_t* col{}; // Column indices (array of size nnz)
+    T* val{};            // Values (array of size nnz)
 
     CSR() = default;
     CSR(std::int32_t nnz_, std::int32_t m_, std::int32_t n_);
@@ -33,22 +37,28 @@ struct CSR {
     auto operator=(CSR&& other) noexcept -> CSR&;
     ~CSR();
 
+    // Load a CSR matrix from a binary file
     static auto load_from_filename(const std::string& filename) -> CSR<T, L>
     requires(L == Location::Host);
 
+    // Save a CSR matrix to a binary file
     auto save_to_filename(const std::string& filename) const -> void
     requires(L == Location::Host);
 
+    // Convert matrix between Host and Device
     template<Location To>
     auto to() const -> CSR<T, To>;
 
+    // Swap the contents of two CSR matrices
     template<std::floating_point T_, Location L_>
     friend auto swap(CSR<T_, L_>&, CSR<T_, L_>&) noexcept -> void;
 
+    // Compare two CSR matrices for equality
     template<std::floating_point T_, Location L_>
     friend auto operator==(const CSR<T_, L_>&, const CSR<T_, L_>&) noexcept -> bool
     requires(L_ == Location::Host);
 
+    // Release all allocated resources
     auto release() -> void;
 };
 
@@ -217,9 +227,11 @@ requires(L == Location::Host)
         return false;
     if (!std::equal(lhs.col, lhs.col + lhs.nnz, rhs.col))
         return false;
+
+    // Check values match (with tolerance for floating-point comparison)
     return std::equal(lhs.val, lhs.val + lhs.nnz, rhs.val, [](const T& l, const T& r) {
-        static constexpr T atol = 1e-8;
-        static constexpr T rtol = 1e-5;
+        static constexpr T atol = 1e-8; // Absolute tolerance
+        static constexpr T rtol = 1e-5; // Relative tolerance
         if (l == r)
             return true;
         return std::fabs(l - r) <= (atol + rtol * std::max(std::fabs(l), std::fabs(r)));
@@ -239,6 +251,7 @@ auto CSR<T, L>::release() -> void {
     val = nullptr;
 }
 
+// Type aliases for common use cases
 template<std::floating_point T>
 using HostCSR = utils::CSR<T, utils::Location::Host>;
 template<std::floating_point T>

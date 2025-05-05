@@ -14,6 +14,8 @@ namespace utils {
 
 namespace cg = cooperative_groups;
 
+// Kernel to compute the number of intermediate products (NIP)
+// Each thread processes one row of matrix A and counts the number of elements in corresponding B rows
 template<std::int32_t BLOCK_SIZE>
 __launch_bounds__(BLOCK_SIZE) __global__
     void k_get_nip(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
@@ -31,11 +33,14 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto a_rpt_start = tig < m ? a_rpt[tig] : 0;
     const auto a_rpt_end = tig < m ? a_rpt[tig + 1] : 0;
     std::int32_t row_nip = 0;
+
+    // For each non-zero in row, add the number of non-zeros in the corresponding B row
     for (auto j = a_rpt_start; j < a_rpt_end; j++) {
         const auto col = a_col[j];
         row_nip += b_rpt[col + 1] - b_rpt[col];
     }
 
+    // Reduce within block and atomically add to global counter
     const std::int64_t sum = ReduceT(s_storage).Sum(row_nip);
     cg::invoke_one(cg::this_thread_block(), [&] {
         cuda::atomic_ref<std::int64_t, cuda::thread_scope_device> ref(*nip);
@@ -43,6 +48,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     });
 }
 
+// Calculates total number of intermediate products for A x B sparse matrix multiplication
 template<std::floating_point T>
 auto get_nip(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> std::int64_t {
     static constexpr std::int32_t BLOCK_SIZE = 512;
@@ -51,6 +57,8 @@ auto get_nip(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> std::int64_t {
     auto* tmp = utils::malloc_async<Location::Device>(sizeof(std::int64_t));
     auto* d_nip = static_cast<std::int64_t*>(tmp);
     utils::memset_async(d_nip, 0, sizeof(std::int64_t));
+
+    // Launch kernel with one thread per row of matrix A
     utils::launch_kernel(k_get_nip<BLOCK_SIZE>,
                          cuda::ceil_div(a.m, BLOCK_SIZE),
                          BLOCK_SIZE,
@@ -61,9 +69,9 @@ auto get_nip(const DeviceCSR<T>& a, const DeviceCSR<T>& b) -> std::int64_t {
                          b.rpt,
                          a.m,
                          d_nip);
+
     utils::memcpy_async(&nip, d_nip, sizeof(std::int64_t));
     utils::free_async(d_nip);
-
     utils::stream_sync();
 
     return nip;

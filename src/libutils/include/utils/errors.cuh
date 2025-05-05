@@ -7,6 +7,7 @@
 
 namespace utils {
 
+// Checks CUDA error code and throws exception with detailed source location on failure
 inline auto handle_cuda_error(
     const cudaError_t status,
     const std::source_location location = std::source_location::current()) -> void {
@@ -20,12 +21,7 @@ inline auto handle_cuda_error(
                                          reason));
 }
 
-inline auto handle_last_cuda_error(
-    const std::source_location location = std::source_location::current()) -> void {
-    const cudaError_t error{cudaGetLastError()};
-    handle_cuda_error(error, location);
-}
-
+// Checks cuSPARSE error code and throws exception with detailed source location on failure
 inline auto handle_cusparse_error(
     const cusparseStatus_t status,
     const std::source_location location = std::source_location::current()) -> void {

@@ -1,3 +1,5 @@
+# Enable interprocedural optimizations for release and relwithdebinfo
+# configurations
 include(CheckIPOSupported)
 check_ipo_supported(RESULT CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
 check_ipo_supported(RESULT CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO)

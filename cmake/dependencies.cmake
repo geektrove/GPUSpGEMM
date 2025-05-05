@@ -1,7 +1,6 @@
 include(FetchContent)
 
 find_package(CUDAToolkit REQUIRED)
-find_package(OpenMP REQUIRED)
 
 FetchContent_Declare(
     gsl-lite

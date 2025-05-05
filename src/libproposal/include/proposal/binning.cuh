@@ -22,6 +22,7 @@ namespace cg = cooperative_groups;
 
 namespace proposal {
 
+// Determines which bin a value belongs to based on predefined ranges
 template<auto RANGES>
 __forceinline__ __device__ auto find_bin(const std::int32_t x) -> std::int32_t {
     static constexpr auto N_BINS = gsl::narrow_cast<std::int32_t>(RANGES.size());
@@ -33,6 +34,8 @@ __forceinline__ __device__ auto find_bin(const std::int32_t x) -> std::int32_t {
     __builtin_unreachable();
 }
 
+// First binning kernel: counts the number of rows that belong to each bin
+// without actually assigning rows to bins
 template<std::int32_t BLOCK_SIZE,
          std::int32_t CC,
          BinningType BinType,
@@ -68,6 +71,8 @@ __launch_bounds__(BLOCK_SIZE) __global__
         atomicAdd(bin_sizes + tib, s_bin_sizes[tib]);
 }
 
+// Second binning kernel: assigns each row to its appropriate bin
+// using the bin offsets computed from the first kernel's results
 template<std::int32_t BLOCK_SIZE,
          std::int32_t CC,
          BinningType BinType,
@@ -114,6 +119,8 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
 }
 
+// Optimized path for when all rows fall into a single bin
+// Skips the binning kernels and directly assigns rows
 template<typename Params, std::int32_t N_BINS>
 void small_binning(const std::int32_t m, Meta<Params>& meta) {
     NVTX3_FUNC_RANGE();
@@ -135,6 +142,7 @@ void small_binning(const std::int32_t m, Meta<Params>& meta) {
     utils::stream_sync();
 }
 
+// Main binning function that groups matrix rows according to a metric (NIP or NNZ)
 template<std::floating_point T, typename Params, BinningType BinType, typename GetValueF>
 void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     NVTX3_FUNC_RANGE();
@@ -196,6 +204,7 @@ void binning(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     utils::stream_sync();
 }
 
+// Calculates the maximum NNZ per row, scans C.rpt, allocates C.col and performs symbolic binning 2
 template<std::floating_point T, typename Params, typename GetValueF>
 void sym_binning2(utils::DeviceCSR<T>& C, Meta<Params>& meta, GetValueF get_value) {
     NVTX3_FUNC_RANGE();

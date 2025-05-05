@@ -10,6 +10,8 @@
 
 namespace proposal {
 
+// Cleans up resources allocated during algorithm execution, including
+// device memory and CUDA streams used by the algorithm
 template<typename Params>
 auto cleanup(Meta<Params>& meta) -> void {
     NVTX3_FUNC_RANGE();

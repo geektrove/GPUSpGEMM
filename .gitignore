@@ -13,8 +13,3 @@ justfile
 /.cache/
 /build/
 /data/
-/logs/
-/slurm/
-/results/
-/tmp/
-/figures/

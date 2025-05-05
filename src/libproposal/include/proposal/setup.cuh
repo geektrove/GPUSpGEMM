@@ -22,6 +22,10 @@ namespace proposal {
 
 namespace cg = cooperative_groups;
 
+// Kernel that computes the number of intermediate products (NIP) for each row of result matrix C
+// Also finds the maximum NIP across all rows. Uses two different strategies based on row length:
+// 1. For long rows (>= WARP_SIZE), uses a warp per row with warp-level reduction
+// 2. For short rows (< WARP_SIZE), uses a single thread per row
 template<std::int32_t BLOCK_SIZE>
 __launch_bounds__(BLOCK_SIZE) __global__
     void k_compute_nip(const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
@@ -90,6 +94,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     cg::invoke_one(block, [&] { atomicMax(max_nip, l_max_nip); });
 }
 
+// Allocates device memory for the algorithm's metadata and temporary structures
 template<typename Params>
 void allocate_device_mem(const std::int32_t m, Meta<Params>& meta) {
     // Estimate CUB storage size
@@ -123,6 +128,9 @@ void allocate_device_mem(const std::int32_t m, Meta<Params>& meta) {
     SPDLOG_DEBUG("-- CUB memory on device: {}", meta.cub_storage_size);
 }
 
+// The setup phase initializes result matrix C and algorithm metadata
+// It computes the number of intermediate products (NIP) for each row of C,
+// creates CUDA streams for parallel execution, and allocates required memory
 template<std::floating_point T, typename Params>
 void setup(const utils::DeviceCSR<T>& A,
            const utils::DeviceCSR<T>& B,
@@ -130,7 +138,7 @@ void setup(const utils::DeviceCSR<T>& A,
            Meta<Params>& meta) {
     NVTX3_FUNC_RANGE();
 
-    // Inititalize C dimensions
+    // Initialize C dimensions
     C.m = A.m;
     C.n = B.n;
 

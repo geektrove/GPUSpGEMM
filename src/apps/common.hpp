@@ -13,6 +13,12 @@
 #include <cusparse/cusparse.cuh>
 #include <utils/utils.cuh>
 
+// Template function that implements the common application workflow for sparse matrix multiplication algorithms
+// Parameters:
+// - ValueType: The floating-point type used (float or double)
+// - ConvertToAppDeviceCSR: Function that converts host matrix to device matrix in the format needed by the algorithm
+// - RunT: Function that executes the matrix multiplication and returns result
+// - MeasureT: Function that measures execution time
 template<typename ValueType,
          typename ConvertToAppDeviceCSR,
          typename RunT,
@@ -32,7 +38,7 @@ auto run_app(const std::string& name,
     //
 
     CLI::App app{name};
-    app.require_subcommand(1, 1);
+    app.require_subcommand(1, 1); // Require exactly one subcommand
 
     app.add_option("inputA")
         ->description("Path to input matrix A")
@@ -48,13 +54,16 @@ auto run_app(const std::string& name,
             CLI::IsMember({"trace", "debug", "info", "warn", "error", "critical", "off"}))
         ->default_str("info");
 
+    // Subcommand to validate results against cuSPARSE 2 reference implementation
     app.add_subcommand("validate")
         ->description("Validate the result matrix using cuSPARSE 2");
 
+    // Subcommand to save the result matrix to a file
     auto* save = app.add_subcommand("save")->description(
         "Save the result matrix to a file");
     save->add_option("output")->description("Path to output matrix")->required();
 
+    // Subcommand to benchmark the algorithm
     auto* benchmark =
         app.add_subcommand("benchmark")->description("Benchmark the algorithm");
     benchmark->add_option("--runs")
@@ -97,17 +106,20 @@ auto run_app(const std::string& name,
     //
 
     if (app.got_subcommand("validate")) {
+        // Run the implementation
         const auto h_c = std::invoke([&] {
             const auto app_d_a = convert_to_app_device_csr(h_a);
             const auto app_d_b = convert_to_app_device_csr(h_b);
             return run(app_d_a, app_d_b);
         });
+        // Run cuSPARSE 2 as reference implementation
         const auto h_c_cusparse = std::invoke([&] {
             const auto d_a = h_a.template to<utils::Location::Device>();
             const auto d_b = h_b.template to<utils::Location::Device>();
             return cusparse2(d_a, d_b).template to<utils::Location::Host>();
         });
 
+        // Compare results
         if (h_c == h_c_cusparse) {
             fmt::println("Validation succeeded");
         } else {
@@ -130,6 +142,7 @@ auto run_app(const std::string& name,
     if (app.got_subcommand("save")) {
         const auto& output = save->get_option("output")->as<std::string>();
         fmt::println("Saving result to {}", output);
+        // Run the implementation and save the result
         const auto h_c = std::invoke([&] {
             const auto app_d_a = convert_to_app_device_csr(h_a);
             const auto app_d_b = convert_to_app_device_csr(h_b);
@@ -143,7 +156,7 @@ auto run_app(const std::string& name,
     //
 
     if (app.got_subcommand("benchmark")) {
-        // Initialize NVTX
+        // Initialize NVTX for NVIDIA profiling tools
 #ifndef NVTX_DISABLE
         nvtxInitialize(nullptr);
 #endif
@@ -153,16 +166,17 @@ auto run_app(const std::string& name,
         const auto& pause = benchmark->get_option("--pause")->as<int>();
         const auto pause_ms = std::chrono::milliseconds(pause);
 
+        // Convert matrices to device format once
         const auto app_d_a = convert_to_app_device_csr(h_a);
         const auto app_d_b = convert_to_app_device_csr(h_b);
 
-        // Warmup
+        // Warmup runs to stabilize GPU performance
         for (int i = 0; i < warmups; i++) {
             std::this_thread::sleep_for(pause_ms);
             measure(app_d_a, app_d_b);
         }
 
-        // Execute
+        // Execute the actual benchmark runs
         std::vector<Clock::duration> times(runs);
         for (int i = 0; i < runs; i++) {
             std::this_thread::sleep_for(pause_ms);
@@ -175,10 +189,10 @@ auto run_app(const std::string& name,
             const auto d_b = h_b.template to<utils::Location::Device>();
             return utils::get_nip(d_a, d_b);
         });
-        const auto flop = 2.0 * nip;
+        const auto flop = 2.0 * nip; // Each inner product requires a multiply and add
         const auto h_c = run(app_d_a, app_d_b);
 
-        // Print results
+        // Print benchmark results
         fmt::println("A: {} x {} ({} non-zero elements)", h_a.m, h_a.n, h_a.nnz);
         fmt::println("B: {} x {} ({} non-zero elements)", h_b.m, h_b.n, h_b.nnz);
         fmt::println("NIP: {}", nip);

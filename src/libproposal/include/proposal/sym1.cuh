@@ -4,7 +4,6 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <cuda/std/cstddef>
 #include <cuda/std/functional>
 #include <type_traits>
@@ -58,11 +57,13 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto tip = utils::modpow2(tib, PWARP_SIZE);
     const auto pib = utils::divpow2(tib, PWARP_SIZE);
 
+    // Initialize hash table
     auto* s_tables = reinterpret_cast<std::int32_t*>(smem);
     for (auto i = tib; i < TOTAL_TABLE_SIZE; i += BLOCK_SIZE)
         s_tables[i] = HASH_EMPTY;
     block.sync();
 
+    // Get row id
     const auto row_id = utils::divpow2(tig, PWARP_SIZE);
     if (row_id >= bin_size)
         return;
@@ -93,6 +94,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
     pwarp.sync();
 
+    // Perform a pwarp-wide reduction to get NNZ for the row
     cg::reduce_store_async(pwarp, &nnzs[row], l_nnz, cg::plus<std::int32_t>{});
 }
 
@@ -123,6 +125,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto block = cg::this_thread_block();
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
+    // Initialize hash table
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
     for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
         s_table[i] = HASH_EMPTY;
@@ -157,11 +160,14 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
     block.sync();
 
+    // Perform a block-wide reduction to get NNZ for the row
     auto* reduce_storage = reinterpret_cast<ReduceTempStorageT*>(smem);
     const auto nnz = ReduceT(*reduce_storage).Sum(l_nnz);
     cg::invoke_one(block, [&] { nnzs[row] = nnz; });
 }
 
+// Symbolic 1 phase kernel for large rows that might exceed hash table capacity
+// Similar to k_sym1_smem but with overflow detection and handling
 template<std::int32_t BLOCK_SIZE, std::int32_t TABLE_SIZE>
 __launch_bounds__(BLOCK_SIZE) __global__ void k_sym1_smem_max(
     const __grid_constant__ std::int32_t* const __restrict__ a_rpt,
@@ -187,6 +193,7 @@ __launch_bounds__(BLOCK_SIZE) __global__ void k_sym1_smem_max(
     const auto block = cg::this_thread_block();
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
+    // Initialize hash table
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
     auto* s_nnz = s_table + TABLE_SIZE;
     for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
@@ -227,8 +234,10 @@ __launch_bounds__(BLOCK_SIZE) __global__ void k_sym1_smem_max(
     cg::invoke_one(block, [&] {
         const auto nnz = *s_nnz;
         if (nnz <= THRESHOLD) {
+            // Store NNZ for the row
             nnzs[row] = nnz;
         } else {
+            // Store row id for the row that exceeds the threshold
             const auto idx = atomicAdd(fail_bin_size, 1);
             fail_bin[idx] = row;
         }
@@ -256,6 +265,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto block = cg::this_thread_block();
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
+    // Initialize hash table
     auto* table = tables + (static_cast<ptrdiff_t>(grid.block_rank()) * table_size);
     for (auto i = tib; i < table_size; i += BLOCK_SIZE)
         table[i] = HASH_EMPTY;
@@ -290,10 +300,14 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
     block.sync();
 
+    // Perform a block-wide reduction to get NNZ for the row
     const auto nnz = ReduceT(s_storage).Sum(l_nnz);
     cg::invoke_one(block, [&] { nnzs[row] = nnz; });
 }
 
+// Main function for the symbolic 1 phase
+// Determines the sparsity pattern (number of non-zeros per row) of result matrix C
+// Uses specialized kernels for different row densities (organized by bins)
 template<std::floating_point T, typename Params>
 void sym1(const utils::DeviceCSR<T>& A,
           const utils::DeviceCSR<T>& B,

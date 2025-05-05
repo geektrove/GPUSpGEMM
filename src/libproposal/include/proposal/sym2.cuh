@@ -4,7 +4,6 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <cuda/std/cstddef>
 #include <cuda/std/functional>
 
@@ -70,10 +69,12 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto tip = utils::modpow2(tib, PWARP_SIZE);
     const auto pib = utils::divpow2(tib, PWARP_SIZE);
 
+    // Get row id
     const auto row_id = utils::divpow2(tig, PWARP_SIZE);
     if (row_id >= bin_size)
         return;
 
+    // Initialize hash table
     auto* p_smem = smem + (pib * PWARP_SMEM);
     auto* p_table = reinterpret_cast<std::int32_t*>(p_smem);
     for (auto i = tip; i < TABLE_SIZE; i += PWARP_SIZE)
@@ -153,6 +154,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto block = cg::this_thread_block();
     const auto tib = gsl::narrow_cast<std::int32_t>(block.thread_rank());
 
+    // Initialize hash table
     auto* s_table = reinterpret_cast<std::int32_t*>(smem);
     for (auto i = tib; i < TABLE_SIZE; i += BLOCK_SIZE)
         s_table[i] = HASH_EMPTY;
@@ -232,6 +234,7 @@ __launch_bounds__(BLOCK_SIZE) __global__
     const auto c_offset = c_rpt[row];
     const auto nnz = c_rpt[row + 1] - c_offset;
 
+    // Initialize hash table
     auto* table = tables + static_cast<ptrdiff_t>(big * common_table_size);
     const auto table_size = gsl::narrow_cast<std::int32_t>(nnz / SYM2_RANGE_RATIO);
     assert(table_size <= common_table_size);
@@ -284,6 +287,9 @@ __launch_bounds__(BLOCK_SIZE) __global__
     }
 }
 
+// Main function for the symbolic 2 phase
+// Builds column indices arrays for the result matrix using the sparsity pattern from sym1
+// Uses specialized kernels based on row characteristics (organized by bins)
 template<std::floating_point T, typename Params>
 void sym2(const utils::DeviceCSR<T>& A,
           const utils::DeviceCSR<T>& B,
