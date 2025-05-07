@@ -1,6 +1,6 @@
 # SpGEMM on GPU
 
-This repository contains an implementation of Sparse General Matrix-Matrix Multiplication (SpGEMM) on NVIDIA GPUs. The main implementation is called 'proposal' and is compared against cuSPARSE and OpSparse implementations.
+This repository contains the implementation of the master's thesis "Sparse general matrix-matrix multiplication on GPU". It focuses on a novel binary search accumulator for SpGEMM on NVIDIA GPUs. The main implementation is called 'proposal' and is compared against cuSPARSE and OpSparse implementations to demonstrate its effectiveness.
 
 ## Project Structure
 
@@ -53,7 +53,7 @@ cmake --preset=release -DUSE_DOUBLE_PRECISION=ON
 cmake --build --preset=release --target=proposal
 ```
 
-### Download matrices
+### Download matrices and convert them to the custom .csr binary format
 
 ```bash
 invoke download-matrices
@@ -85,23 +85,23 @@ cmake --build --preset=dev --target=proposal
 ### Run with logging
 
 ```bash
-./build/dev/proposal data/webbase-1M.csr data/webbase-1M.csr --loglevel=debug benchmark
+./build/dev/src/apps/proposal data/webbase-1M.csr data/webbase-1M.csr --loglevel=debug benchmark
 ```
 
 ### Run with compute sanitizer
 
 ```bash
-compute-sanitizer --tool=memcheck ./build/dev/proposal data/webbase-1M.csr data/webbase-1M.csr benchmark
+compute-sanitizer --tool=memcheck ./build/dev/src/apps/proposal data/webbase-1M.csr data/webbase-1M.csr benchmark
 ```
 
 ### Validate the result against cuSPARSE 2 algorithm
 
 ```bash
-./build/dev/proposal data/webbase-1M.csr data/webbase-1M.csr validate
+./build/dev/src/apps/proposal data/webbase-1M.csr data/webbase-1M.csr validate
 ```
 
 ### Save the output matrix to a file for later analysis
 
 ```bash
-./build/dev/proposal data/webbase-1M.csr data/webbase-1M.csr save /tmp/webbase-1M-squared.csr
+./build/dev/src/apps/proposal data/webbase-1M.csr data/webbase-1M.csr save /tmp/webbase-1M-squared.csr
 ```
